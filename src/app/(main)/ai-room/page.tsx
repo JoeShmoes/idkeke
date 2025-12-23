@@ -380,14 +380,20 @@ FORMATTING RULES:
         body: JSON.stringify({ messages: messagesForAPI, mode }),
       });
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(`API error: ${response.status}${err?.details ? ` - ${err.details}` : ''}`);
+      const isOk = response.ok;
+      const payload = await response.json().catch(() => ({} as any));
+
+      if (!isOk) {
+        const status = response.status;
+        const details = typeof payload?.details === 'string' ? payload.details : '';
+        setIsSearchingWeb(false);
+        setSearchSources([]);
+        const hint = status === 401 ? 'Authentication failed. Check MISTRAL_API_KEY.' : '';
+        return `I apologize, sir. I'm experiencing technical difficulties. ${hint} ${details}`.trim();
       }
 
-      const data = await response.json();
+      const content = String(payload?.content || '').trim();
 
-      // Simulate web search sources for demo
       if (mode === 'web' || mode === 'deep-research') {
         setSearchSources([
           'https://wikipedia.org',
@@ -399,12 +405,12 @@ FORMATTING RULES:
       }
 
       setIsSearchingWeb(false);
-      return data.content;
-    } catch (error) {
-      console.error('Mistral API error:', error);
+      return content || "I apologize, but I couldn't generate a response. Please try again.";
+    } catch (error: any) {
       setIsSearchingWeb(false);
       setSearchSources([]);
-      return "I apologize, sir. I'm experiencing technical difficulties at the moment. Please try again later.";
+      const msg = typeof error?.message === 'string' ? error.message : '';
+      return `I apologize, sir. I'm experiencing technical difficulties. ${msg}`.trim();
     }
   };
 
