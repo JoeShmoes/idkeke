@@ -17,22 +17,25 @@ export const supabase = configured
   : ({
       auth: {
         async getSession() {
-          return { data: { session: null } };
+          return { data: { session: null }, error: null };
         },
         async signUp() {
-          throw new Error(
+          const error = new Error(
             'Supabase configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
           );
+          return { data: { user: null, session: null }, error };
         },
         async signInWithPassword() {
-          throw new Error(
+          const error = new Error(
             'Supabase configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
           );
+          return { data: { user: null, session: null }, error };
         },
         async resetPasswordForEmail() {
-          throw new Error(
+          const error = new Error(
             'Supabase configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
           );
+          return { data: null, error };
         },
       },
     } as any);
