@@ -1,0 +1,274 @@
+
+/**
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model for all data.
+ *
+ * Data Structure:
+ * All data is nested under /users/{userId}, and each user's data is further organized into subcollections
+ * for different modules (business, finance, health, creativity, learning, networking, research, tasks, and AI insights).
+ *
+ * Key Security Decisions:
+ * - Users can only access their own data.
+ * - No data is publicly readable or writable.
+ * - Listing of user documents is allowed only for the owner.
+ * - Assumes that user IDs are unique and correctly populated in the data.
+ *
+ * Denormalization for Authorization:
+ * - The 'userId' is denormalized into the documents of the subcollections to ensure that the security rules can be enforced
+ *   without needing to read the parent document.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Secure user profile information.
+     * @path /users/{userId}
+     * @allow (create) User with matching ID can create their profile.
+     * @allow (get, list, update, delete) Authenticated user can only access their own profile.
+     * @deny (create) User with mismatched ID cannot create a profile.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's profile.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure business data for a user.
+     * @path /users/{userId}/businesses/{businessId}
+     * @allow (create) Authenticated user can create business data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own business data.
+     * @deny (create) Authenticated user cannot create business data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's business data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/businesses/{businessId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure finance data for a user.
+     * @path /users/{userId}/finances/{financeId}
+     * @allow (create) Authenticated user can create finance data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own finance data.
+     * @deny (create) Authenticated user cannot create finance data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's finance data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/finances/{financeId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure health data for a user.
+     * @path /users/{userId}/health/{healthId}
+     * @allow (create) Authenticated user can create health data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own health data.
+     * @deny (create) Authenticated user cannot create health data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's health data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/health/{healthId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure creativity data for a user.
+     * @path /users/{userId}/creativities/{creativityId}
+     * @allow (create) Authenticated user can create creativity data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own creativity data.
+     * @deny (create) Authenticated user cannot create creativity data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's creativity data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/creativities/{creativityId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure learning data for a user.
+     * @path /users/{userId}/learnings/{learningId}
+     * @allow (create) Authenticated user can create learning data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own learning data.
+     * @deny (create) Authenticated user cannot create learning data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's learning data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/learnings/{learningId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure networking data for a user.
+     * @path /users/{userId}/networkings/{networkingId}
+     * @allow (create) Authenticated user can create networking data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own networking data.
+     * @deny (create) Authenticated user cannot create networking data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's networking data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/networkings/{networkingId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure research data for a user.
+     * @path /users/{userId}/research/{researchId}
+     * @allow (create) Authenticated user can create research data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own research data.
+     * @deny (create) Authenticated user cannot create research data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's research data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/research/{researchId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure task data for a user.
+     * @path /users/{userId}/tasks/{taskId}
+     * @allow (create) Authenticated user can create task data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own task data.
+     * @deny (create) Authenticated user cannot create task data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's task data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/tasks/{taskId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secure AI insight data for a user.
+     * @path /users/{userId}/aiInsights/{aiInsightId}
+     * @allow (create) Authenticated user can create AI insight data for themselves.
+     * @allow (get, list, update, delete) Authenticated user can only access their own AI insight data.
+     * @deny (create) Authenticated user cannot create AI insight data for another user.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's AI insight data.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/aiInsights/{aiInsightId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}

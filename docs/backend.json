@@ -1,0 +1,553 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Nexaris Module application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "User's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "User's last name."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User's phone number.",
+          "format": "phone"
+        },
+        "aiPersona": {
+          "type": "string",
+          "description": "The AI persona selected by the user (e.g., Formal Advisor, Friendly Coach)."
+        },
+        "preferences": {
+          "type": "string",
+          "description": "User's preferences stored as JSON."
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email"
+      ]
+    },
+    "Business": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Business",
+      "type": "object",
+      "description": "Represents business-related data for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Business entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Business)"
+        },
+        "kanbanPipeline": {
+          "type": "string",
+          "description": "JSON data representing the Kanban pipeline state."
+        },
+        "adSeoTrackerData": {
+          "type": "string",
+          "description": "JSON data for Ad & SEO tracking."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+    "Finance": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Finance",
+      "type": "object",
+      "description": "Represents financial data for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Finance entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Finance)"
+        },
+        "budget": {
+          "type": "number",
+          "description": "User's budget."
+        },
+        "recurringExpenses": {
+          "type": "string",
+          "description": "JSON data representing recurring expenses."
+        },
+        "investmentData": {
+          "type": "string",
+          "description": "JSON data for user's investments."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+    "Health": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Health",
+      "type": "object",
+      "description": "Represents health and wellness data for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Health entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Health)"
+        },
+        "workoutPlan": {
+          "type": "string",
+          "description": "JSON data representing the workout plan."
+        },
+        "nutritionData": {
+          "type": "string",
+          "description": "JSON data for nutrition tracking."
+        },
+        "recoveryData": {
+          "type": "string",
+          "description": "JSON data for recovery metrics (sleep, hydration, stress)."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+    "Creativity": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Creativity",
+      "type": "object",
+      "description": "Represents creativity and content-related data for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Creativity entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Creativity)"
+        },
+        "contentCalendar": {
+          "type": "string",
+          "description": "JSON data representing the content calendar."
+        },
+        "ideaVault": {
+          "type": "string",
+          "description": "JSON data representing the user's idea vault."
+        },
+        "engagementAnalysis": {
+          "type": "string",
+          "description": "JSON data for content engagement analysis."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+    "Learning": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Learning",
+      "type": "object",
+      "description": "Represents learning and knowledge-related data for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Learning entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Learning)"
+        },
+        "skillTracker": {
+          "type": "string",
+          "description": "JSON data representing the skill tracker."
+        },
+        "lessonFeed": {
+          "type": "string",
+          "description": "JSON data representing the AI-curated lesson feed."
+        },
+        "mindMap": {
+          "type": "string",
+          "description": "JSON data representing the interactive mind map."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+    "Networking": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Networking",
+      "type": "object",
+      "description": "Represents networking and relationship management data for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Networking entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Networking)"
+        },
+        "contactSphere": {
+          "type": "string",
+          "description": "JSON data representing the 3D clickable network (contact sphere)."
+        },
+        "eventTimeline": {
+          "type": "string",
+          "description": "JSON data representing the event timeline planner."
+        },
+        "conversationVault": {
+          "type": "string",
+          "description": "JSON data for storing conversation notes."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+    "Research": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Research",
+      "type": "object",
+      "description": "Represents research-related data for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Research entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Research)"
+        },
+        "searchHistory": {
+          "type": "string",
+          "description": "JSON data representing search history."
+        },
+        "competitorAnalysisData": {
+          "type": "string",
+          "description": "JSON data for competitor analysis."
+        },
+        "trendRadarData": {
+          "type": "string",
+          "description": "JSON data for detected trends."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a task for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Task entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Task)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the task."
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Due date of the task.",
+          "format": "date-time"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Priority of the task (e.g., 1 for high, 2 for medium, 3 for low)."
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Indicates whether the task is completed."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "description"
+      ]
+    },
+    "AiInsight": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AiInsight",
+      "type": "object",
+      "description": "Represents an AI-generated insight for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AI Insight entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N AiInsight)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the insight was generated.",
+          "format": "date-time"
+        },
+        "moduleSource": {
+          "type": "string",
+          "description": "The module from which the data was derived to generate this insight. (Business, Finance, Health, etc.)"
+        },
+        "insightText": {
+          "type": "string",
+          "description": "The generated insight text."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "timestamp",
+        "moduleSource",
+        "insightText"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ],
+    "authorizedDomains": [
+        "localhost"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information. The 'userId' parameter is used to ensure only the authenticated user can access their own data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/businesses/{businessId}",
+        "definition": {
+          "entityName": "Business",
+          "schema": {
+            "$ref": "#/backend/entities/Business"
+          },
+          "description": "Stores business-related data for a user.  The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "businessId",
+              "description": "The unique identifier of the business."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/finances/{financeId}",
+        "definition": {
+          "entityName": "Finance",
+          "schema": {
+            "$ref": "#/backend/entities/Finance"
+          },
+          "description": "Stores financial data for a user.  The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "financeId",
+              "description": "The unique identifier of the finance record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/health/{healthId}",
+        "definition": {
+          "entityName": "Health",
+          "schema": {
+            "$ref": "#/backend/entities/Health"
+          },
+          "description": "Stores health and wellness data for a user. The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "healthId",
+              "description": "The unique identifier of the health record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/creativities/{creativityId}",
+        "definition": {
+          "entityName": "Creativity",
+          "schema": {
+            "$ref": "#/backend/entities/Creativity"
+          },
+          "description": "Stores creativity-related data for a user. The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "creativityId",
+              "description": "The unique identifier of the creativity record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/learnings/{learningId}",
+        "definition": {
+          "entityName": "Learning",
+          "schema": {
+            "$ref": "#/backend/entities/Learning"
+          },
+          "description": "Stores learning-related data for a user. The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "learningId",
+              "description": "The unique identifier of the learning record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/networkings/{networkingId}",
+        "definition": {
+          "entityName": "Networking",
+          "schema": {
+            "$ref": "#/backend/entities/Networking"
+          },
+          "description": "Stores networking-related data for a user. The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "networkingId",
+              "description": "The unique identifier of the networking record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/research/{researchId}",
+        "definition": {
+          "entityName": "Research",
+          "schema": {
+            "$ref": "#/backend/entities/Research"
+          },
+          "description": "Stores research-related data for a user. The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "researchId",
+              "description": "The unique identifier of the research record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Stores tasks for a user. The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "taskId",
+              "description": "The unique identifier of the task."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/aiInsights/{aiInsightId}",
+        "definition": {
+          "entityName": "AiInsight",
+          "schema": {
+            "$ref": "#/backend/entities/AiInsight"
+          },
+          "description": "Stores AI-generated insights for a user. The 'userId' parameter ensures ownership. Denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "aiInsightId",
+              "description": "The unique identifier of the AI Insight."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure Authorization Independence, DBAC, and support secure list operations (QAPs). User-owned data is stored under `/users/{userId}` to leverage path-based security. Each module (Business, Finance, Health, etc.) is stored as a subcollection under the user's document to maintain a clear ownership hierarchy. This allows for simple and robust security rules based on `request.auth.uid`. AI Insights are also stored as a subcollection under the user, ensuring only the user can access their own insights.\n\nAuthorization Independence is achieved because each document's security is determined solely by the user ID in the path (`request.auth.uid == userId`) without needing to read parent documents. This avoids the use of `get()` calls in security rules.\n\nQAPs are supported via structural segregation. Each module's data is in its own subcollection, ensuring that all documents within a subcollection share the same security requirements (owned by the user). This simplifies list operations, as security rules can allow listing all documents where `request.auth.uid == userId`."
+  }
+}
+    

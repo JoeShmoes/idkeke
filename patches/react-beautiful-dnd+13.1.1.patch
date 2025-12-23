@@ -1,0 +1,168 @@
+diff --git a/node_modules/react-beautiful-dnd/dist/react-beautiful-dnd.esm.js b/node_modules/react-beautiful-dnd/dist/react-beautiful-dnd.esm.js
+index 581a179..f19e487 100644
+--- a/node_modules/react-beautiful-dnd/dist/react-beautiful-dnd.esm.js
++++ b/node_modules/react-beautiful-dnd/dist/react-beautiful-dnd.esm.js
+@@ -7,7 +7,7 @@
+ import { createPortal } from 'react-dom';
+ import _extends from '@babel/runtime/helpers/extends';
+ import _objectWithoutPropertiesLoose from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
+-import React, { Component, PureComponent, createElement, createContext, useMemo, useEffect, useCallback, useState } from 'react';
++import React, { Component, PureComponent, createElement, createContext, useMemo, useEffect, useCallback, useState, Children } from 'react';
+ import { flushSync } from 'react-dom';
+ import memoizeOne from 'memoize-one';
+ import { createStore, applyMiddleware } from 'redux';
+@@ -10714,7 +10714,9 @@
+ 
+   var InnerDroppable = function (_PureComponent) {
+     _inherits(InnerDroppable, _PureComponent);
+-
++    function InnerDroppable() {
++      return _PureComponent.apply(this, arguments)
++    }
+     var _proto = InnerDroppable.prototype;
+ 
+     _proto.componentDidMount = function componentDidMount() {
+@@ -10839,7 +10841,7 @@
+       isClone: Boolean(isClone),
+       direction: direction
+     }, this.getDroppableRef, this.props.droppableId);
+-    var children = this.props.children;
++    var children = this.props.children ? this.props.children : [];
+ 
+     var _droppableComponent = this.getDroppableComponent(provided, snapshot);
+ 
+@@ -11281,7 +11283,9 @@
+ 
+   var Droppable = function (_Component) {
+     _inherits(Droppable, _Component);
+-
++    function Droppable() {
++      return _Component.apply(this, arguments)
++    }
+     var _proto = Droppable.prototype;
+ 
+     _proto.render = function render() {
+@@ -11341,7 +11345,7 @@
+       "Cannot provide a value prop to <Draggable />. You must use the `parent` prop"
+     );
+     var parent = this.props.parent;
+-    var children = parent.props.children;
++    var children = parent.props.children ? parent.props.children : [];
+     var index = this.props.index;
+ 
+     if (index >= children.length) {
+@@ -11364,7 +11368,9 @@
+ 
+   var InnerDraggable = function (_PureComponent) {
+     _inherits(InnerDraggable, _PureComponent);
+-
++    function InnerDraggable() {
++      return _PureComponent.apply(this, arguments)
++    }
+     var _proto = InnerDraggable.prototype;
+ 
+     _proto.getDraggableRef = function getDraggableRef() {
+@@ -11874,7 +11880,7 @@
+       return null;
+     }
+ 
+-    var child = this.props.children(provided, snapshot, rubric);
++    var child = this.props.children ? this.props.children(provided, snapshot, rubric) : null;
+ 
+     var canDrag = function (value) {
+       if (!value) {
+@@ -12270,7 +12276,9 @@
+ 
+   var Draggable = function (_Component) {
+     _inherits(Draggable, _Component);
+-
++    function Draggable() {
++      return _Component.apply(this, arguments)
++    }
+     var _proto = Draggable.prototype;
+ 
+     _proto.render = function render() {
+diff --git a/node_modules/react-beautiful-dnd/dist/react-beautiful-dnd.js b/node_modules/react-beautiful-dnd/dist/react-beautiful-dnd.js
+index f10b503..9a1c1d9 100644
+--- a/node_modules/react-beautiful-dnd/dist/react-beautiful-dnd.js
++++ b/node_modules/react-beautiful-dnd/dist/react-beautiful-dnd.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, '__esModule', { value: true });
+ 
+ var ReactDOM = require('react-dom');
+-var React = require('react');
++var React = require('react')
+ var reactDom = require('react-dom');
+ var memoizeOne = require('memoize-one');
+ var redux = require('redux');
+@@ -12450,7 +12450,9 @@
+ 
+     var InnerDroppable = /*#__PURE__*/function (_PureComponent) {
+       _inherits(InnerDroppable, _PureComponent);
+-
++      function InnerDroppable() {
++        return _PureComponent.apply(this, arguments);
++      }
+       var _proto = InnerDroppable.prototype;
+ 
+       _proto.componentDidMount = function componentDidMount() {
+@@ -12575,7 +12577,7 @@
+         isClone: Boolean(isClone),
+         direction: direction
+       }, this.getDroppableRef, this.props.droppableId);
+-      var children = this.props.children;
++      var children = this.props.children ? this.props.children : [];
+ 
+       var _droppableComponent = this.getDroppableComponent(provided, snapshot);
+ 
+@@ -13017,7 +13019,9 @@
+ 
+     var Droppable = /*#__PURE__*/function (_Component) {
+       _inherits(Droppable, _Component);
+-
++      function Droppable() {
++        return _Component.apply(this, arguments);
++      }
+       var _proto = Droppable.prototype;
+ 
+       _proto.render = function render() {
+@@ -13077,7 +13081,7 @@
+       "Cannot provide a value prop to <Draggable />. You must use the `parent` prop");
+       var parent = this.props.parent;
+-      var children = parent.props.children;
++      var children = parent.props.children ? parent.props.children : [];
+       var index = this.props.index;
+ 
+       if (index >= children.length) {
+@@ -13100,7 +13104,9 @@
+ 
+     var InnerDraggable = /*#__PURE__*/function (_PureComponent) {
+       _inherits(InnerDraggable, _PureComponent);
+-
++      function InnerDraggable() {
++        return _PureComponent.apply(this, arguments);
++      }
+       var _proto = InnerDraggable.prototype;
+ 
+       _proto.getDraggableRef = function getDraggableRef() {
+@@ -13610,7 +13616,7 @@
+         return null;
+       }
+ 
+-      var child = this.props.children(provided, snapshot, rubric);
++      var child = this.props.children ? this.props.children(provided, snapshot, rubric) : null;
+ 
+       var canDrag = function (value) {
+         if (!value) {
+@@ -14006,7 +14012,9 @@
+ 
+     var Draggable = /*#__PURE__*/function (_Component) {
+       _inherits(Draggable, _Component);
+-
++      function Draggable() {
++        return _Component.apply(this, arguments);
++      }
+       var _proto = Draggable.prototype;
+ 
+       _proto.render = function render() {
+

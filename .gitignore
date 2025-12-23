@@ -1,0 +1,26 @@
+
+# Build output
+/dist
+/build
+/.next
+node_modules/
+dist/
+dist-app/
+dist-app-clean/
+dist-new/
+installer/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+*.local
+/.vscode
+/.idea
+/.cache
+/.turbo
+coverage/
+*.zip
+*.tar.gz
+new-repo/
+**/.next/
