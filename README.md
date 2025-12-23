@@ -5,6 +5,11 @@ Welcome to the Nexaris Module, a comprehensive personal operating system designe
 ![Nexaris Module](https://picsum.photos/seed/nexaris-module/1200/600)
 <p align="center"><i>A unified dashboard for your entire life.</i></p>
 
+## Deployment Note (Netlify)
+This project is configured for Netlify deployment with Serverless Functions.
+- **API Routes**: Serverless functions are enabled (static export disabled).
+- **Environment Variables**: Ensure `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `MISTRAL_API_KEY` are set in your Netlify Site Settings.
+
 ## Philosophy and Design Principles
 
 The Nexaris Module is built on a few core principles:
