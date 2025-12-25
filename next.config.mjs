@@ -14,7 +14,6 @@ const nextConfig = {
       },
     ]
   },
-  distDir: 'build',
   reactStrictMode: false,
   typescript: {
     ignoreBuildErrors: true,
