@@ -28,6 +28,7 @@ function createWindow() {
     height: 800,
     show: false, // Don't show until ready
     autoHideMenuBar: true,
+    frame: false, // Frameless window to remove top bar
     icon: path.join(__dirname, '../icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -39,11 +40,34 @@ function createWindow() {
   // Set custom UserAgent to detect desktop app
   win.webContents.setUserAgent(win.webContents.getUserAgent() + ' NexarisDesktop');
 
-  // Inject CSS to hide Home button (back to home link)
+  // Inject CSS to hide Home button (back to home link) AND make window draggable
   win.webContents.on('did-finish-load', () => {
     win.webContents.insertCSS(`
       a[href="https://nexarismodule.framer.ai/"] {
         display: none !important;
+      }
+      /* Make the top area draggable */
+      body {
+        -webkit-app-region: no-drag;
+      }
+      /* Assuming there is a header or top bar, make it draggable. 
+         If not, we might need to add a dedicated drag bar. 
+         For now, let's make a small strip at the top draggable if possible, 
+         but since we are loading a remote URL, we can't easily add elements.
+         We will rely on the user dragging via empty spaces if any, or just frame: false.
+         Warning: frame: false without custom drag region makes it hard to move.
+         We'll add a drag region to the top 30px of the body.
+      */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 30px;
+        z-index: 9999;
+        -webkit-app-region: drag;
+        pointer-events: none; /* Let clicks pass through */
       }
     `);
   });
@@ -52,7 +76,7 @@ function createWindow() {
 
   win.loadURL(startUrl);
 
-  // Wait for splash animation (e.g. 3 seconds) and page load
+  // Wait for splash animation (Netflix style takes about 4s)
   setTimeout(() => {
     win.once('ready-to-show', () => {
       splash.destroy();
@@ -63,7 +87,7 @@ function createWindow() {
         win.show();
         splash.destroy();
     }
-  }, 3000);
+  }, 4000);
 
   win.setMenuBarVisibility(false);
   win.webContents.on('will-navigate', (e, url) => {

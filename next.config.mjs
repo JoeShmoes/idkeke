@@ -40,11 +40,6 @@ const nextConfig = {
     // This allows the build to succeed with Turbopack even if webpack config is present
   },
   webpack: (config) => {
-    // Alias react-hotkeys-hook to our stub so webpack can always resolve it
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'react-hotkeys-hook': path.resolve(__dirname, 'src/hooks/react-hotkeys-hook-stub.ts'),
-    };
     return config;
   },
 };
