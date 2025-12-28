@@ -8,6 +8,10 @@ dist/
 dist-app/
 dist-app-clean/
 dist-new/
+dist-app-v2/
+dist-installer/
+dist-packager/
+.builder-cache/
 installer/
 .DS_Store
 Thumbs.db

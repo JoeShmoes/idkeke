@@ -36,6 +36,9 @@ const nextConfig = {
       }
     ],
   },
+  turbopack: {
+    // This allows the build to succeed with Turbopack even if webpack config is present
+  },
   webpack: (config) => {
     // Alias react-hotkeys-hook to our stub so webpack can always resolve it
     config.resolve.alias = {

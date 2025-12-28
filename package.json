@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "dist": "npm run build",
     "build:desktop": "npm run build && electron-builder -w",
-    "build:packager": "npm run build && npm run prepare:packager && electron-packager . NexarisModule --platform=win32 --arch=x64 --out=dist-app --overwrite --prune=true --asar --ignore=\"node_modules|dist|dist-app|dist-app-clean|installer|\\.git|out|build\\\\cache|build\\\\server|\\\\.next\"",
+    "build:packager": "npm run build && npm run prepare:packager && electron-packager . NexarisModule --platform=win32 --arch=x64 --out=dist-app --overwrite --prune=true --asar --icon=icon.ico --ignore=\"node_modules|dist|dist-app|dist-app-clean|installer|\\.git|out|build\\\\cache|build\\\\server|\\\\.next\"",
     "build:installer:inno": "iscc installer\\nexaris-media.iss"
   },
   "dependencies": {
@@ -55,7 +55,7 @@
     "jspdf": "^2.5.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.475.0",
-    "next": "^16.1.1",
+    "next": "15.3.3",
     "react": "^18.3.1",
     "react-beautiful-dnd": "^13.1.1",
     "react-day-picker": "^9.12.0",
@@ -73,22 +73,23 @@
   "build": {
     "appId": "com.nexaris.module",
     "productName": "Nexaris Module",
-    "icon": ".idx\\icon.png",
+    "icon": "icon.ico",
     "compression": "maximum",
     "directories": {
-      "output": "dist-new"
+      "output": "dist-app"
     },
     "files": [
       "electron/**",
-      "build/**",
+      "icon.ico",
       "!node_modules/**"
     ],
     "win": {
       "target": "nsis",
+      "icon": "icon.ico",
       "artifactName": "NexarisModule-Setup-${version}.exe"
     },
     "nsis": {
-      "installerIcon": ".idx\\icon.png",
+      "installerIcon": "icon.ico",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
@@ -102,8 +103,10 @@
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",
     "electron-packager": "^17.1.1",
+    "electron-winstaller": "^5.4.0",
     "eslint": "9.39.2",
     "eslint-config-next": "16.0.10",
+    "innosetup-compiler": "^6.3.1",
     "png-to-ico": "^3.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",

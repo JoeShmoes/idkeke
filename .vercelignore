@@ -1,0 +1,11 @@
+node_modules
+build
+dist
+.git
+.trae
+.log
+.figma
+.next
+dist-new
+dist-app
+.git_temp

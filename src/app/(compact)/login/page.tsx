@@ -204,6 +204,14 @@ export default function LoginPage() {
     }
   };
   
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.userAgent.includes('NexarisDesktop')) {
+      setIsDesktop(true);
+    }
+  }, []);
+
   if (!isClient) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background gap-4">
@@ -214,14 +222,16 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-      <div className="absolute top-4 left-4">
-        <Link href="https://nexarismodule.framer.ai/" target="_self">
-          <Button variant="ghost">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Button>
-        </Link>
-      </div>
+      {!isDesktop && (
+        <div className="absolute top-4 left-4">
+          <Link href="https://nexarismodule.framer.ai/" target="_self">
+            <Button variant="ghost">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Button>
+          </Link>
+        </div>
+      )}
       <div className="w-full max-w-md space-y-8">
         <div className="space-y-2 text-center">
           <h1 className="text-3xl font-bold">Welcome to Nexaris</h1>
