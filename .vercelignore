@@ -19,3 +19,4 @@ installer
 *.snap
 *.AppImage
 .git_backup
+dist-unpacked*
