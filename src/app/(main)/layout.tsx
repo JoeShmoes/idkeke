@@ -11,7 +11,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/components/layout/app-provider';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function MainLayout({
@@ -22,8 +22,10 @@ export default function MainLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { appSettings, userProfile } = useApp();
-  const noPaddingRoutes = ['/ai-room', '/notes', '/research', '/settings', '/communications-secure-briefing-room', '/project-board', '/tasks'];
+  const noPaddingRoutes = ['/ai-room', '/notes', '/research', '/settings', '/communications-secure-briefing-room', '/project-board', '/tasks', '/sheets'];
   const hasPadding = !noPaddingRoutes.some(route => pathname.startsWith(route));
+  const disableScrollRoutes = ['/sheets', '/ai-room'];
+  const isScrollDisabled = disableScrollRoutes.some(route => pathname.startsWith(route));
   const hideRightSidebarRoutes = ['/file-vault', '/communications-secure-briefing-room', '/research'];
   const shouldShowRightSidebar = appSettings.rightSidebar.isOpen && !hideRightSidebarRoutes.some(route => pathname.startsWith(route));
 
@@ -42,17 +44,28 @@ export default function MainLayout({
     enforceAuth();
   }, [router, userProfile]);
 
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.userAgent.includes('NexarisDesktop')) {
+      setIsDesktop(true);
+    }
+  }, []);
+
   return (
     <div className={cn(
-        "flex h-screen w-full bg-background overflow-hidden",
-        appSettings.sidebar.side === 'right' && 'flex-row-reverse'
+        "flex h-full w-full bg-background overflow-hidden flex-col",
     )}>
+        <div className={cn(
+            "flex flex-1 w-full overflow-hidden",
+            appSettings.sidebar.side === 'right' && 'flex-row-reverse'
+        )}>
         <AppSidebar />
-        <SidebarInset>
-            <div className="flex-1 h-screen flex flex-col min-w-0">
+        <SidebarInset className={cn(isScrollDisabled && "h-screen overflow-hidden")}>
+            <div className="flex-1 h-full flex flex-col min-w-0">
                 <Header />
                 <main className={cn(
-                    "flex-1 flex flex-col min-h-0 overflow-y-auto", 
+                    "flex-1 flex flex-col min-h-0",
+                    isScrollDisabled ? "overflow-hidden" : "overflow-y-auto", 
                     hasPadding && "p-4 sm:p-6 lg:p-8"
                 )}>
                     {children}
@@ -65,6 +78,7 @@ export default function MainLayout({
             appSettings.sidebar.side === 'left' ? 'border-l' : 'border-r'
         )}>
             <RightSidebar />
+        </div>
         </div>
         <Tour />
     </div>

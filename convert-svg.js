@@ -5,17 +5,8 @@ const fs = require('fs');
 app.disableHardwareAcceleration();
 
 app.whenReady().then(async () => {
-  const win = new BrowserWindow({
-    width: 512,
-    height: 512,
-    show: false,
-    webPreferences: {
-      offscreen: true
-    }
-  });
-
-  const svgPath = path.join(__dirname, 'public', 'sidebar-logo-favicon.svg');
-  // Load the SVG file directly
+  const win = new BrowserWindow({ width: 512, height: 512, show: false, webPreferences: { offscreen: true } });
+  const svgPath = path.join(__dirname, 'Screenshot 2025-11-05 183945.svg');
   await win.loadURL(`file://${svgPath}`);
 
   // Wait a bit for rendering

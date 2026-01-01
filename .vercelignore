@@ -7,5 +7,15 @@ dist
 .figma
 .next
 dist-new
-dist-app
+dist-app*
 .git_temp
+installer
+*.exe
+*.zip
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.snap
+*.AppImage
+.git_backup

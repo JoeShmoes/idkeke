@@ -27,8 +27,9 @@ interface ActivityItem {
 const Section = ({ title, children }: { title: string, children: React.ReactNode }) => {
     return (
         <div className="flex flex-col h-full">
-            <h3 className="text-lg font-semibold px-4 pt-4 pb-3">{title}</h3>
-            <Separator />
+            <div className="flex h-16 items-center px-4 border-b shrink-0 bg-background">
+                <h3 className="text-xl font-semibold">{title}</h3>
+            </div>
             <ScrollArea className="flex-1">
                 <div className="p-4 space-y-4">
                     {children}
@@ -41,7 +42,7 @@ const Section = ({ title, children }: { title: string, children: React.ReactNode
 export default function RightSidebar() {
     const { 
         projects, clients, transactions, notes, networkContacts, appSettings, tasks,
-        accounts, goals, learningResources, researchSessions
+        accounts, goals, learningResources, researchSessions, assets
     } = useApp();
 
     const activityFeed: ActivityItem[] = useMemo(() => {
@@ -442,18 +443,23 @@ export default function RightSidebar() {
 
 
     return (
-        <ResizablePanelGroup direction="vertical" className="h-full border-l bg-background flex flex-col overflow-hidden">
-             <ResizablePanel defaultSize={33}>
-               {orderedPanels[0]?.component || <div/>}
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel defaultSize={34}>
-                {orderedPanels[1]?.component || <div/>}
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel defaultSize={33}>
-                 {orderedPanels[2] ? orderedPanels[2].component : panels.activities}
-            </ResizablePanel>
-        </ResizablePanelGroup>
+        <div className="flex flex-col h-full border-l bg-background">
+            <div className="h-16 flex items-center px-4 border-b flex-shrink-0">
+                <h2 className="text-lg font-semibold">Activity & Updates</h2>
+            </div>
+            <ResizablePanelGroup direction="vertical" className="flex-1 overflow-hidden">
+                <ResizablePanel defaultSize={33}>
+                    {orderedPanels[0]?.component || <div/>}
+                </ResizablePanel>
+                <ResizableHandle />
+                <ResizablePanel defaultSize={34}>
+                    {orderedPanels[1]?.component || <div/>}
+                </ResizablePanel>
+                <ResizableHandle />
+                <ResizablePanel defaultSize={33}>
+                    {orderedPanels[2] ? orderedPanels[2].component : panels.activities}
+                </ResizablePanel>
+            </ResizablePanelGroup>
+        </div>
     )
 }

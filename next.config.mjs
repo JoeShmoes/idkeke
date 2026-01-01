@@ -6,14 +6,7 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/',
-        destination: '/dashboard',
-      },
-    ]
-  },
+  output: process.env.NEXT_MANUAL_EXPORT ? 'export' : undefined,
   reactStrictMode: false,
   typescript: {
     ignoreBuildErrors: true,

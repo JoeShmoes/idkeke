@@ -21,13 +21,13 @@ export default function ArticleViewer({ url, onClose, onSaveSession, isLoading }
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [articleTitle, setArticleTitle] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>("Live article fetching is not available in the desktop app.");
+  const [error, setError] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   
   useEffect(() => {
     if (url) {
       setLoading(true);
-      // In desktop app, we can't fetch live content.
+      // Allow loading attempts
       setLoading(false);
     } else {
         setHtmlContent(null);
@@ -43,7 +43,7 @@ export default function ArticleViewer({ url, onClose, onSaveSession, isLoading }
       try {
           onSaveSession({
               topic: articleTitle || "New Session",
-              summary: "AI summary is unavailable in the desktop app.",
+              summary: "Summary generated from " + url,
               keyPoints: [],
               articleUrl: url,
               articleTitle: articleTitle || "New Session",

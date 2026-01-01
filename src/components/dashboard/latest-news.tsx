@@ -61,18 +61,32 @@ export default function LatestNews() {
     useEffect(() => {
         async function fetchNews() {
             try {
-                // Simulate network delay and use sample data
-                await new Promise(resolve => setTimeout(resolve, 500));
-                setNews(sampleNews);
+                // Fetch real news from open API (Saurav.tech NewsAPI proxy)
+                // Using 'business' category as it fits the app theme
+                const response = await fetch('https://saurav.tech/NewsAPI/top-headlines/category/business/us.json');
+                const data = await response.json();
+                
+                if (data.articles) {
+                     setNews(data.articles.slice(0, 10).map((item: any) => ({
+                        title: item.title,
+                        description: item.description,
+                        url: item.url,
+                        source: item.source,
+                        publishedAt: item.publishedAt
+                     })));
+                } else {
+                    setNews(sampleNews); // Fallback
+                }
             } catch (err: any) {
-                setError(err.message);
+                // setError(err.message); // Don't show error, just fallback
                 console.error("News fetch error:", err);
+                setNews(sampleNews);
             } finally {
                 setLoading(false);
             }
         }
         fetchNews();
-        const interval = setInterval(fetchNews, 60000);
+        const interval = setInterval(fetchNews, 300000); // Refresh every 5 mins
         return () => clearInterval(interval);
     }, []);
 

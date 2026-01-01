@@ -1,5 +1,6 @@
 'use client';
 
+import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -27,6 +28,7 @@ import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import type { NavItem, NavGroup as NavGroupType } from '@/lib/types';
 import { iconMap } from '@/lib/nav-items';
+import { supabase } from '@/lib/supabase';
 
 const NavGroup = ({
   label,
@@ -82,27 +84,46 @@ const NavGroup = ({
   );
 };
 
-export default function AppSidebar() {
-  const { userProfile, appSettings, chats } = useApp();
+interface AppSidebarProps {
+  className?: string;
+}
+
+export default function AppSidebar({ className }: AppSidebarProps) {
+  const { userProfile, appSettings, chats, setUserProfile } = useApp();
   const router = useRouter();
   const pathname = usePathname();
 
-  const handleLogout = () => {
-    localStorage.removeItem('contextflow-workspace-key');
-    router.replace('/login');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem('contextflow-workspace-key');
+      setUserProfile({ name: 'User', email: '', firstName: '', lastName: '', hasSeenTour: false });
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Error logging out:', error);
+      // Force redirect anyway
+      localStorage.removeItem('contextflow-workspace-key');
+      window.location.href = '/login';
+    }
   };
 
   const navStructure: NavGroupType[] = appSettings.navStructure || [];
 
   return (
     <Sidebar
+      className={cn("border-r", className)}
       variant={appSettings.sidebar.variant}
       side={appSettings.sidebar.side}
       collapsible={appSettings.sidebar.collapsible}
     >
       {/* Header */}
-      <SidebarHeader className="h-16">
+      <SidebarHeader className="h-16 hidden">
+        <Logo className="h-10 w-10" />
+      </SidebarHeader>
+
+      <SidebarHeader className="h-16 flex flex-row items-center px-2 border-b">
         <DropdownMenu>
+
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"

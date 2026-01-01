@@ -13,6 +13,16 @@ import { useApp } from '@/components/layout/app-provider';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import AiSidebar from '@/components/ai-room/ai-sidebar';
 import type { Message, Chat } from '@/lib/types';
 
@@ -91,6 +101,7 @@ export default function AiRoomPage() {
   const [isSearchingWeb, setIsSearchingWeb] = useState(false);
   const [searchSources, setSearchSources] = useState<string[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   // Pinned chat feature removed
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -227,24 +238,35 @@ useEffect(() => {
 
   // pinChat and unpinChat provided by context
 
+  const renameChat = (chatId: string, newName: string) => {
+    setChats(prev => prev.map(chat =>
+      chat.id === chatId ? { ...chat, name: newName } : chat
+    ));
+  };
+
   const deleteChat = (chatId: string) => {
-    if (window.confirm('Are you sure you want to delete this chat? This action cannot be undone.')) {
-      setChats(prev => {
-        const next = prev.filter(chat => chat.id !== chatId);
-        if (currentChatId === chatId) {
-          if (next.length > 0) {
-            const mostRecent = next
-              .slice()
-              .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())[0];
-            setCurrentChatId(mostRecent.id);
-            setMessages(mostRecent.messages);
-          } else {
-            createNewChat();
-          }
+    setChatToDelete(chatId);
+  };
+
+  const confirmDeleteChat = () => {
+    if (!chatToDelete) return;
+    
+    setChats(prev => {
+      const next = prev.filter(chat => chat.id !== chatToDelete);
+      if (currentChatId === chatToDelete) {
+        if (next.length > 0) {
+          const mostRecent = next
+            .slice()
+            .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())[0];
+          setCurrentChatId(mostRecent.id);
+          setMessages(mostRecent.messages);
+        } else {
+          createNewChat();
         }
-        return next;
-      });
-    }
+      }
+      return next;
+    });
+    setChatToDelete(null);
   };
 
   const updateChatMessages = (chatId: string, updatedMessages: Message[]) => {
@@ -374,25 +396,37 @@ FORMATTING RULES:
     ];
 
     try {
-      const response = await fetch(LOCAL_AI_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: messagesForAPI, mode }),
-      });
+      let content = '';
+      
+      // @ts-ignore
+      if (typeof window !== 'undefined' && window.electron) {
+        // @ts-ignore
+        const result = await window.electron.ipcRenderer.invoke('ai-chat', { messages: messagesForAPI, mode });
+        if (result.error) {
+           throw new Error(result.error + (result.details ? ': ' + result.details : ''));
+        }
+        content = String(result.content || '').trim();
+      } else {
+        const response = await fetch(LOCAL_AI_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: messagesForAPI, mode }),
+        });
 
-      const isOk = response.ok;
-      const payload = await response.json().catch(() => ({} as any));
+        const isOk = response.ok;
+        const payload = await response.json().catch(() => ({} as any));
 
-      if (!isOk) {
-        const status = response.status;
-        const details = typeof payload?.details === 'string' ? payload.details : '';
-        setIsSearchingWeb(false);
-        setSearchSources([]);
-        const hint = status === 401 ? 'Authentication failed. Check MISTRAL_API_KEY.' : '';
-        return `I apologize, sir. I'm experiencing technical difficulties. ${hint} ${details}`.trim();
+        if (!isOk) {
+          const status = response.status;
+          const details = typeof payload?.details === 'string' ? payload.details : '';
+          setIsSearchingWeb(false);
+          setSearchSources([]);
+          const hint = status === 401 ? 'Authentication failed. Check MISTRAL_API_KEY.' : '';
+          return `I apologize, sir. I'm experiencing technical difficulties. ${hint} ${details}`.trim();
+        }
+
+        content = String(payload?.content || '').trim();
       }
-
-      const content = String(payload?.content || '').trim();
 
       if (mode === 'web' || mode === 'deep-research') {
         setSearchSources([
@@ -460,6 +494,12 @@ FORMATTING RULES:
 
     const finalMessages = [...updatedMessages, aiMessage];
     updateChatMessages(activeChatId, finalMessages);
+    
+    // Auto-name chat if it's the first exchange (User + AI = 2 messages)
+    if (finalMessages.length === 2) {
+      updateChatName(activeChatId, finalMessages);
+    }
+
     setIsThinking(false);
     setCurrentMode(null);
   };
@@ -767,6 +807,7 @@ FORMATTING RULES:
                 currentChatId={currentChatId}
                 switchChat={switchChat}
                 deleteChat={deleteChat}
+                renameChat={renameChat}
               />
             </div>
           </div>
@@ -1261,6 +1302,21 @@ FORMATTING RULES:
       )}
 
       {/* Pinned chat feature removed */}
+
+      <AlertDialog open={!!chatToDelete} onOpenChange={(open) => !open && setChatToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Delete Chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+                Are you sure you want to delete this chat? This action cannot be undone.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setChatToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteChat}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

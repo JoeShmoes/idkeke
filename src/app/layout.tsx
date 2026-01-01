@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import AppProvider from '@/components/layout/app-provider';
 import AppBody from '@/components/layout/app-body';
+import { SyncManager } from '@/components/sync-manager';
 
 
 export const metadata: Metadata = {
@@ -32,6 +33,7 @@ export default function RootLayout({
       </head>
       <body>
             <AppProvider>
+                <SyncManager />
                 <AppBody>
                     {children}
                 </AppBody>

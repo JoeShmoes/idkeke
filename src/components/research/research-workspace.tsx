@@ -27,6 +27,18 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
   const [imageToPreview, setImageToPreview] = useState<string | null>(null);
   const articleRef = useRef<HTMLDivElement>(null);
 
+    const [iframeHeight, setIframeHeight] = useState(800);
+
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data && event.data.type === 'resize' && typeof event.data.height === 'number') {
+                setIframeHeight(event.data.height + 40); // Add some padding
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
+
   useEffect(() => {
     if (session) {
         setNotes(session.userNotes || '');
@@ -43,15 +55,53 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
   useEffect(() => {
     if (session?.articleUrl) {
       setLoadingContent(true);
-      setHtmlContent(null);
-      setError("Live article fetching is not available in the desktop app.");
+      setError(null);
+      
+      // If it's a Wikipedia URL, try to fetch the HTML content
+      if (session.articleUrl.includes('wikipedia.org')) {
+        const titleMatch = session.articleUrl.match(/\/wiki\/([^#?]+)/);
+        if (titleMatch && titleMatch[1]) {
+           const title = decodeURIComponent(titleMatch[1]);
+           
+           let fetchPromise;
+           if (typeof window !== 'undefined' && (window as any).electron) {
+               // Electron: Use IPC
+               fetchPromise = (window as any).electron.ipcRenderer.invoke('fetch-wiki', title);
+           } else {
+               // Web: Use API Proxy
+               fetchPromise = fetch(`/api/wiki?title=${encodeURIComponent(title)}`).then(res => {
+                    if (!res.ok) throw new Error('Failed to load Wikipedia content');
+                    return res.json();
+               });
+           }
+
+           fetchPromise
+             .then((data: any) => {
+                 if (data.error) throw new Error(data.error);
+                 if (data.html) {
+                     setHtmlContent(data.html);
+                 } else {
+                     throw new Error('No HTML content returned');
+                 }
+             })
+             .catch((err: any) => {
+                 console.error("Wiki fetch error", err);
+                 setHtmlContent(`<div class="p-4 text-center text-muted-foreground"><p>Could not load full article preview.</p><p class="mt-2 text-sm">${err.message || 'Unknown error'}</p><p class="mt-4 text-sm font-semibold">${session.summary}</p></div>`);
+             })
+             .finally(() => setLoadingContent(false));
+           return;
+        }
+      }
+
+      // Fallback for non-wiki or failed parse
+      setHtmlContent(`<p>${session.summary || 'No preview available.'}</p>`);
       setLoadingContent(false);
     } else {
         setHtmlContent(null);
         setError(null);
         setLoadingContent(false);
     }
-  }, [session?.articleUrl]);
+  }, [session?.articleUrl, session?.summary]);
 
   const handleArticleClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -121,7 +171,75 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
                             ) : error ? (
                                 <p className="text-destructive text-center p-4">{error}</p>
                             ) : (
-                                <div dangerouslySetInnerHTML={{ __html: htmlContent || '' }}/>
+                                <iframe 
+                                    srcDoc={`
+                                        <!DOCTYPE html>
+                                        <html>
+                                        <head>
+                                            <base target="_blank">
+                                            <meta name="color-scheme" content="light dark">
+                                            <style>
+                                                :root {
+                                                    color-scheme: light dark;
+                                                }
+                                                body { 
+                                                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                                                    line-height: 1.6;
+                                                    margin: 0;
+                                                    padding: 1rem;
+                                                    background-color: transparent;
+                                                }
+                                                
+                                                /* Dynamic text color based on theme */
+                                                body, p, h1, h2, h3, h4, h5, h6, li, span, div, td, th {
+                                                    color: light-dark(#000000, #ffffff);
+                                                }
+
+                                                /* Ensure links are distinct */
+                                                a { color: light-dark(#2563eb, #60a5fa); }
+
+                                                img { max-width: 100%; height: auto; border-radius: 6px; }
+                                                table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+                                                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                                                @media (prefers-color-scheme: dark) {
+                                                    th, td { border-color: #333; }
+                                                }
+                                                .infobox { 
+                                                    float: right; 
+                                                    margin: 0 0 1rem 1rem; 
+                                                    border: 1px solid #ddd; 
+                                                    background: #f9f9f9; 
+                                                    padding: 10px; 
+                                                    max-width: 300px;
+                                                    font-size: 0.9em;
+                                                }
+                                                @media (prefers-color-scheme: dark) {
+                                                     .infobox {
+                                                         background: #1f1f1f;
+                                                         border-color: #333;
+                                                     }
+                                                 }
+                                             </style>
+                                             <script>
+                                                function sendHeight() {
+                                                    const height = document.body.scrollHeight;
+                                                    window.parent.postMessage({ type: 'resize', height: height }, '*');
+                                                }
+                                                window.addEventListener('load', sendHeight);
+                                                window.addEventListener('resize', sendHeight);
+                                                // Check periodically for dynamic content
+                                                setInterval(sendHeight, 1000);
+                                             </script>
+                                         </head>
+                                         <body>
+                                             ${htmlContent || ''}
+                                         </body>
+                                         </html>
+                                     `}
+                                     className="w-full border-none"
+                                     style={{ height: iframeHeight }}
+                                     title="Research Content"
+                                 />
                             )}
                         </article>
                     </div>
@@ -134,14 +252,14 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
                         <Notebook className="h-5 w-5"/>
                         <h2 className="text-lg font-semibold">My Notes</h2>
                     </div>
-                    <ScrollArea className="flex-1">
+                    <div className="flex-1 p-0 relative">
                         <Textarea 
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                             placeholder="Start typing your notes here..."
-                            className="w-full h-full p-6 border-none resize-none shadow-none focus-visible:ring-0 !ring-offset-0 text-base bg-transparent leading-relaxed"
+                            className="absolute inset-0 w-full h-full p-6 border-none resize-none shadow-none focus-visible:ring-0 !ring-offset-0 text-base bg-transparent leading-relaxed rounded-none"
                         />
-                    </ScrollArea>
+                    </div>
                 </div>
             </ResizablePanel>
         </ResizablePanelGroup>

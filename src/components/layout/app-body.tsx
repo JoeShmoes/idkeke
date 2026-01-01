@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '@/components/layout/app-provider';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
@@ -12,9 +12,18 @@ import { Loader2 } from 'lucide-react';
 import { CommandPaletteProvider } from './search-palette';
 import { useSound } from '@/hooks/use-sound';
 
+import WindowControls from '../ui/window-controls';
+
 export default function AppBody({ children }: { children: React.ReactNode }) {
     const { appSettings, loading, isDataLoaded, welcomePlayed, setWelcomePlayed } = useApp();
     const { playSound } = useSound();
+
+    const [isDesktop, setIsDesktop] = useState(false);
+    useEffect(() => {
+        if (typeof navigator !== 'undefined' && navigator.userAgent.includes('NexarisDesktop')) {
+            setIsDesktop(true);
+        }
+    }, []);
   
     // This effect safely applies the theme on the client side after hydration
     useEffect(() => {
@@ -41,6 +50,7 @@ export default function AppBody({ children }: { children: React.ReactNode }) {
     if(loading) {
       return (
         <div className="flex h-screen w-full flex-col items-center justify-center bg-background gap-4">
+            <WindowControls />
             <Loader2 className="h-8 w-8 animate-spin" />
             <p className="text-muted-foreground">Loading Workspace...</p>
         </div>
@@ -48,18 +58,26 @@ export default function AppBody({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className={cn("font-sans antialiased min-h-screen", "bg-background")}>
-          <CommandPaletteProvider>
-            <HoverProvider>
-                <SidebarProvider>
-                  <GlobalContextMenu>
-                    <div className={cn(!loading ? 'opacity-100 transition-opacity duration-500' : 'opacity-0', 'min-h-screen')}>
-                      {children}
-                    </div>
-                  </GlobalContextMenu>
-                </SidebarProvider>
-            </HoverProvider>
-          </CommandPaletteProvider>
+        <div 
+            className={cn("font-sans antialiased h-screen flex flex-col overflow-hidden gap-[10px]", "bg-background")}
+            style={{ 
+                paddingTop: isDesktop ? "32px" : "0px" 
+            } as React.CSSProperties}
+        >
+          <WindowControls />
+          <div className="flex-1 flex flex-col overflow-hidden relative">
+            <CommandPaletteProvider>
+                <HoverProvider>
+                    <SidebarProvider>
+                    <GlobalContextMenu>
+                        <div className={cn(!loading ? 'opacity-100 transition-opacity duration-500' : 'opacity-0', 'h-full w-full')}>
+                        {children}
+                        </div>
+                    </GlobalContextMenu>
+                    </SidebarProvider>
+                </HoverProvider>
+            </CommandPaletteProvider>
+          </div>
             <Toaster />
         </div>
     );

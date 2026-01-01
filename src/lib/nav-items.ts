@@ -3,7 +3,7 @@ import type { NavGroup } from './types';
 import { 
     Home, MessageSquareWarning, CheckSquare, Award, Briefcase, TrendingUp, KanbanSquare, 
     Users, Search, Notebook, Newspaper, Truck, Palette, File, Cpu, DollarSign, Building, 
-    User, HeartPulse, BookOpen, Network, Bot, GitBranch, PenSquare, Presentation, FileText
+    User, HeartPulse, BookOpen, Network, Bot, GitBranch, PenSquare, Presentation, FileText, FileSpreadsheet
 } from 'lucide-react';
 
 export const iconMap: { [key: string]: React.ElementType } = {
@@ -33,6 +33,7 @@ export const iconMap: { [key: string]: React.ElementType } = {
     PenSquare,
     Presentation,
     FileText,
+    FileSpreadsheet,
 };
 
 export const allNavItems: NavGroup[] = [
@@ -63,6 +64,7 @@ export const allNavItems: NavGroup[] = [
     items: [
       { href: '/research', label: 'Research', icon: 'Search' },
       { href: '/notes', label: 'Notes', icon: 'Notebook' },
+      { href: '/sheets', label: 'Sheets', icon: 'FileSpreadsheet' },
       { href: '/news', label: 'News', icon: 'Newspaper' },
       { href: '/workshop-fabrication-garage', label: 'Workshop', icon: 'Truck' },
     ],

@@ -68,7 +68,7 @@ const KEYS = {
   WELCOME: 'welcome-sound-played'
 };
 
-const CURRENT_NAV_VERSION = '1.8';
+const CURRENT_NAV_VERSION = '1.9';
 
 // Helper function to calculate the next occurrence date for a repeating task
 const getNextOccurrenceDate = (repeat: RepeatDays, currentDate: Date = new Date()): Date => {

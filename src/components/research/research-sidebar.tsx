@@ -76,38 +76,39 @@ export default function ResearchSidebar({
         </div>
       <ScrollArea className="flex-1">
         {filteredSessions.length > 0 ? (
-          <div className="p-2 space-y-1">
+          <div className="p-2 space-y-2">
             {filteredSessions.map(session => (
               <div
                 key={session.id}
                 onClick={() => onSelectSession(session.id)}
                 className={cn(
-                  'w-full text-left p-3 rounded-md group transition-colors cursor-pointer',
+                  'w-full text-left p-3 rounded-lg border transition-all cursor-pointer relative group',
                   activeSessionId === session.id
-                    ? 'bg-background shadow-sm'
-                    : 'hover:bg-background/50'
+                    ? 'bg-primary/10 border-primary/20 shadow-sm'
+                    : 'bg-card hover:bg-accent/50 border-transparent hover:border-border'
                 )}
               >
-                <div className="flex items-start justify-between">
-                    <div className="flex-1 pr-2">
-                        <h3 className="font-semibold text-sm truncate">{session.topic}</h3>
-                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
-                        </p>
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-start justify-between">
+                         <h3 className="font-medium text-sm truncate pr-6">{session.topic}</h3>
                     </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setSessionToDelete(session.id);
-                            }}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
+                    </p>
+                </div>
+                
+                <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setSessionToDelete(session.id);
+                        }}
+                    >
+                        <Trash2 className="h-3 w-3" />
+                    </Button>
                 </div>
               </div>
             ))}

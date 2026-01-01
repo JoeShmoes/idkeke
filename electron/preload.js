@@ -4,5 +4,7 @@ contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
     send: (channel, data) => ipcRenderer.send(channel, data),
     on: (channel, func) => ipcRenderer.on(channel, (event, ...args) => func(...args)),
+    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
   },
+  updateTitleBarOverlay: (options) => ipcRenderer.send('update-title-bar-overlay', options),
 });

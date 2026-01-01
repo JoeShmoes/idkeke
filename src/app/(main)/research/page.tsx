@@ -55,20 +55,72 @@ export default function ResearchPage() {
         if (!topic.trim()) return;
         setIsLoading(true);
 
-        const newSession: ResearchSession = {
-            id: `research-${Date.now()}`,
-            topic: topic,
-            summary: "AI summary is unavailable in the desktop app.",
-            keyPoints: [],
-            userNotes: `# ${topic}\n\n`,
-            articleUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(topic.replace(/ /g, '_'))}`,
-            articleTitle: topic,
-            createdAt: new Date().toISOString(),
-        };
+        try {
+            let searchData;
+            let summaryData;
 
-        setResearchSessions(prev => [newSession, ...prev]);
-        setActiveSessionId(newSession.id);
-        setIsLoading(false);
+            // Step 1: Search for the best matching page title
+            if (typeof window !== 'undefined' && (window as any).electron) {
+                 // Electron: Use IPC
+                 searchData = await (window as any).electron.ipcRenderer.invoke('wiki-search', topic);
+            } else {
+                 // Web: Use Fetch
+                 const searchRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(topic)}&format=json&origin=*`);
+                 searchData = await searchRes.json();
+            }
+
+            if (searchData.error) throw new Error(searchData.error);
+            
+            let bestTitle = topic;
+            if (searchData.query?.search?.length > 0) {
+                bestTitle = searchData.query.search[0].title;
+            }
+
+            // Step 2: Fetch summary for the best title
+            if (typeof window !== 'undefined' && (window as any).electron) {
+                 // Electron: Use IPC
+                 summaryData = await (window as any).electron.ipcRenderer.invoke('wiki-summary', bestTitle);
+            } else {
+                 // Web: Use Fetch
+                 const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(bestTitle)}`);
+                 if (!response.ok) throw new Error('Summary fetch failed');
+                 summaryData = await response.json();
+            }
+            
+            if (summaryData.error) throw new Error(summaryData.error);
+            
+            const data = summaryData;
+
+            const newSession: ResearchSession = {
+                id: `research-${Date.now()}`,
+                topic: data.title || bestTitle,
+                summary: data.extract || "No summary available from Wikipedia.",
+                keyPoints: [],
+                userNotes: '',
+                articleUrl: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(bestTitle.replace(/ /g, '_'))}`,
+                articleTitle: data.title || bestTitle,
+                createdAt: new Date().toISOString(),
+            };
+
+            setResearchSessions(prev => [newSession, ...prev]);
+            setActiveSessionId(newSession.id);
+        } catch (error) {
+            console.error("Wikipedia fetch error:", error);
+             const newSession: ResearchSession = {
+                id: `research-${Date.now()}`,
+                topic: topic,
+                summary: "Could not fetch summary from Wikipedia. Please check your connection or try a different topic.",
+                keyPoints: [],
+                userNotes: '',
+                articleUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(topic.replace(/ /g, '_'))}`,
+                articleTitle: topic,
+                createdAt: new Date().toISOString(),
+            };
+            setResearchSessions(prev => [newSession, ...prev]);
+            setActiveSessionId(newSession.id);
+        } finally {
+            setIsLoading(false);
+        }
         
     }, [setResearchSessions]);
 
