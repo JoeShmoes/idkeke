@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run build:static",
+    "dist": "npm run build:static && electron-builder --win nsis",
     "build:desktop": "electron-builder -w",
     "build:packager": "npm run build:static && npm run prepare:packager && electron-packager . NexarisModule --platform=win32 --arch=x64 --out=dist-app --overwrite --prune=true --asar --icon=icon.ico --ignore=\"node_modules|dist|dist-app|dist-app-clean|installer|\\.git|out|build\\\\cache|build\\\\server|\\\\.next\"",
     "build:installer:inno": "iscc installer\\nexaris-media.iss",
