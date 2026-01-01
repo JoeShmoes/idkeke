@@ -16,7 +16,7 @@
     "build:desktop": "electron-builder -w",
     "build:packager": "npm run build:static && npm run prepare:packager && electron-packager . NexarisModule --platform=win32 --arch=x64 --out=dist-app --overwrite --prune=true --asar --icon=icon.ico --ignore=\"node_modules|dist|dist-app|dist-app-clean|installer|\\.git|out|build\\\\cache|build\\\\server|\\\\.next\"",
     "build:installer:inno": "iscc installer\\nexaris-media.iss",
-    "build:static": "cross-env NEXT_MANUAL_EXPORT=true next build"
+    "build:static": "node tools/toggle-api.js hide && cross-env NEXT_MANUAL_EXPORT=true next build && node tools/toggle-api.js restore"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
@@ -77,7 +77,7 @@
     "appId": "com.nexaris.module",
     "productName": "Nexaris Module",
     "directories": {
-      "output": "dist-unpacked-v26"
+      "output": "dist-unpacked-v27"
     },
     "files": [
       "electron/**",
@@ -103,7 +103,7 @@
       "allowToChangeInstallationDirectory": false,
       "deleteAppDataOnUninstall": true,
       "runAfterFinish": true,
-      "artifactName": "NexarisModuleSetupV26.exe"
+      "artifactName": "NexarisModuleSetupV27.exe"
     }
   },
   "devDependencies": {
