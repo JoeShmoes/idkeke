@@ -11,13 +11,17 @@ const getScopedKey = (baseKey: string) => {
 export function useSafeLocalStorage<T>(
   key: string,
   defaultValue: T
-): [T, React.Dispatch<React.SetStateAction<T>>] {
+): [T, React.Dispatch<React.SetStateAction<T>>, boolean] {
   const [value, setValue] = useState<T>(defaultValue);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     // This effect runs only on the client, after the component has mounted.
     const scopedKey = getScopedKey(key);
-    if (!scopedKey) return;
+    if (!scopedKey) {
+      setIsLoaded(true);
+      return;
+    }
 
     try {
       const item = window.localStorage.getItem(scopedKey);
@@ -25,7 +29,9 @@ export function useSafeLocalStorage<T>(
         setValue(JSON.parse(item));
       }
     } catch (error) {
-      console.warn(`Error reading localStorage key "${scopedKey}":`, error);
+      console.error(`Error reading localStorage key "${scopedKey}":`, error);
+    } finally {
+      setIsLoaded(true);
     }
   }, [key]);
 
@@ -38,9 +44,11 @@ export function useSafeLocalStorage<T>(
       setValue(valueToStore);
       window.localStorage.setItem(scopedKey, JSON.stringify(valueToStore));
     } catch (error) {
-      console.warn(`Error setting localStorage key "${scopedKey}":`, error);
+      console.error(`Error setting localStorage key "${scopedKey}":`, error);
+      // Optional: Dispatch a custom event so the UI can react to storage errors
+      window.dispatchEvent(new CustomEvent('local-storage-error', { detail: { key: scopedKey, error } }));
     }
   }, [key, value]);
 
-  return [value, setValueAndStore as React.Dispatch<React.SetStateAction<T>>];
+  return [value, setValueAndStore as React.Dispatch<React.SetStateAction<T>>, isLoaded];
 }

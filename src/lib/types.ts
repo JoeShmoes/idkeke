@@ -14,13 +14,51 @@ export interface NavGroup {
     items: NavItem[];
 }
 
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title?: string;
+  description?: string;
+  start_date: string;
+  end_date?: string | null;
+  all_day?: boolean;
+  tag?: string;
+  calendar_id?: string;
+  checklist?: ChecklistItem[];
+  color?: string;
+  reminderMinutesBefore?: number | null;
+  recurrence?: {
+    enabled?: boolean;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval: number;
+    weekDays?: number[]; // 0=Sun, 1=Mon, etc.
+    endDate?: string;
+  };
+}
+
+export interface CalendarDefinition {
+  id: string;
+  name: string;
+  color?: string;
+  visible?: boolean;
+  category?: 'my' | 'other';
+}
+
 export interface Note {
   id: string;
   title: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-  tags: string[];
+  content: any; // Yoopta content
+  createdAt?: number;
+  updatedAt: number;
+  cover?: string;
+  icon?: string;
+  tags?: string[];
+  parentId?: string;
 }
 
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
@@ -94,7 +132,51 @@ export interface Account {
   id:string;
   name: string;
   balance: number;
-  type: 'checking' | 'savings' | 'investment' | 'credit';
+  type: 'checking' | 'savings' | 'investment' | 'credit' | 'loan' | 'cash';
+  interestRate?: number; // For debts/savings
+  limit?: number; // For credit cards
+  dueDate?: number; // Day of month for payments
+}
+
+export interface RecurringTransaction {
+  id: string;
+  name: string;
+  amount: number;
+  type: TransactionType;
+  category: string;
+  frequency: 'weekly' | 'bi-weekly' | 'monthly' | 'yearly';
+  nextDueDate: string;
+  accountId: string;
+  active: boolean;
+}
+
+export interface Debt {
+  id: string;
+  name: string;
+  balance: number;
+  interestRate: number;
+  minimumPayment: number;
+  dueDate: number; // Day of month
+  strategy: 'snowball' | 'avalanche';
+  accountId?: string; // Link to account if exists
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline?: string;
+  category: 'emergency' | 'purchase' | 'investment' | 'travel' | 'other';
+  monthlyContribution: number;
+}
+
+export interface Budget {
+  id: string;
+  name: string;
+  amount: number;
+  category: string;
+  period: 'monthly' | 'yearly';
 }
 
 export type AssetCategory = 'physical' | 'digital' | 'creative';
@@ -153,10 +235,12 @@ export interface Message {
   text: string;
   timestamp: Date;
   isEditing?: boolean;
+  isIncomplete?: boolean;
   originalText?: string;
   mode?: string;
   sources?: string[];
-  attachments?: Array<{ name: string; size: number; type: string } | File>;
+  reasoning_details?: any;
+  attachments?: Array<{ name: string; size: number; type: string; data?: any } | File>;
 }
 
 export interface Chat {
@@ -165,6 +249,40 @@ export interface Chat {
   messages: Message[];
   createdAt: Date;
   lastActivity: Date;
+}
+
+export type AIMemorySource = 'chat' | 'app';
+
+export interface AIMemory {
+  id: string;
+  text: string;
+  source: AIMemorySource;
+  createdAt: string;
+}
+
+export interface GrowthTaskCriteria {
+    type: 'project_count' | 'task_count' | 'note_count' | 'client_count' | 'net_worth' | 'manual';
+    target?: number;
+    category?: string;
+}
+
+export interface GrowthTask {
+    id: string;
+    title: string;
+    description: string;
+    xp: number;
+    difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+    status: 'pending' | 'completed';
+    category: 'learning' | 'health' | 'productivity' | 'finance';
+    icon?: string;
+    criteria?: GrowthTaskCriteria;
+    path?: string; // Route to navigate to for completing the task
+}
+
+export interface GrowthHistory {
+    date: string;
+    xpGained: number;
+    tasksCompleted: number;
 }
 
 export interface AnswerFromDocumentOutput {
@@ -195,6 +313,7 @@ export interface LearningResource {
     status: LearningResourceStatus;
     notes?: string;
     createdAt: string;
+    icon?: string;
 }
 
 export interface NetworkContact {
@@ -204,6 +323,8 @@ export interface NetworkContact {
     company: string;
     lastContacted: string; // ISO date string
     notes?: string;
+    icon?: string;
+    meetingLink?: string;
 }
 
 export interface UserProfile {
@@ -214,6 +335,7 @@ export interface UserProfile {
     phoneNumber?: string;
     hasCompletedSetup?: boolean;
     hasSeenTour?: boolean;
+    meetingLink?: string;
 }
 
 export interface VaultFile {
@@ -291,6 +413,12 @@ export interface AppSettings {
         variant: SidebarVariant;
         collapsible: SidebarCollapsible;
     };
+    commandPalette: {
+        includeTasks: boolean;
+        includeNotes: boolean;
+        includeContacts: boolean;
+        includeProjects: boolean;
+    };
     rightSidebar: {
         isOpen: boolean;
         order: ('notifications' | 'activities' | 'contacts')[];
@@ -299,6 +427,7 @@ export interface AppSettings {
         defaultGroupId: string;
         defaultView: TaskView;
         kanbanColumns: string[];
+        hideCompletedTasks: boolean;
     };
     finance: {
         defaultCurrency: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'CAD';
@@ -318,10 +447,9 @@ export interface AppSettings {
         goToTasks: Shortcut;
         goToResearch: Shortcut;
         goToNotes: Shortcut;
-        goToNews: Shortcut;
         goToClients: Shortcut;
         goToProjects: Shortcut;
-        goToFinance: Shortcut;
+        goToBudgeting: Shortcut;
         goToAssets: Shortcut;
         goToBrandRoom: Shortcut;
         goToFileVault: Shortcut;
@@ -332,4 +460,51 @@ export interface AppSettings {
         goToWorkshop: Shortcut;
         goToAutomation: Shortcut;
     }
+}
+
+export interface AppContextType {
+  appSettings: AppSettings;
+  setAppSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
+  projects: Project[];
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+  clients: Client[];
+  setClients: React.Dispatch<React.SetStateAction<Client[]>>;
+  transactions: Transaction[];
+  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  notes: Note[];
+  setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
+  tasks: Task[];
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+  taskGroups: TaskGroup[];
+  setTaskGroups: React.Dispatch<React.SetStateAction<TaskGroup[]>>;
+  networkContacts: NetworkContact[];
+  setNetworkContacts: React.Dispatch<React.SetStateAction<NetworkContact[]>>;
+  accounts: Account[];
+  setAccounts: React.Dispatch<React.SetStateAction<Account[]>>;
+  goals: Goal[];
+  setGoals: React.Dispatch<React.SetStateAction<Goal[]>>;
+  learningResources: LearningResource[];
+  setLearningResources: React.Dispatch<React.SetStateAction<LearningResource[]>>;
+  researchSessions: ResearchSession[];
+  setResearchSessions: React.Dispatch<React.SetStateAction<ResearchSession[]>>;
+  vaultFiles: VaultFile[];
+  setVaultFiles: React.Dispatch<React.SetStateAction<VaultFile[]>>;
+  vaultFolders: VaultFolder[];
+  setVaultFolders: React.Dispatch<React.SetStateAction<VaultFolder[]>>;
+  sheets: SheetFile[];
+  setSheets: React.Dispatch<React.SetStateAction<SheetFile[]>>;
+  assets: Asset[];
+  setAssets: React.Dispatch<React.SetStateAction<Asset[]>>;
+  userProfile: UserProfile;
+  setUserProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
+  loading: boolean;
+  isDataLoaded: boolean;
+  welcomePlayed: boolean;
+  setWelcomePlayed: React.Dispatch<React.SetStateAction<boolean>>;
+  aiMemories: AIMemory[];
+  setAiMemories: React.Dispatch<React.SetStateAction<AIMemory[]>>;
+  selectedRoom: string | null;
+  setSelectedRoom: React.Dispatch<React.SetStateAction<string | null>>;
+  aiMessageCount: number;
+  setAiMessageCount: React.Dispatch<React.SetStateAction<number>>;
 }

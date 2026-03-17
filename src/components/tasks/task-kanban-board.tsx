@@ -19,10 +19,13 @@ interface TaskKanbanBoardProps {
     allGroups?: TaskGroup[];
     onUpdateTask: (task: Task) => void;
     onDeleteTask: (taskId: string) => void;
+    selectedTasks?: string[];
+    onToggleSelection?: (taskId: string, e?: React.MouseEvent) => void;
+    isDragDisabled?: boolean;
 }
 
-export default function TaskKanbanBoard({ tasks, groups, allGroups, onUpdateTask, onDeleteTask }: TaskKanbanBoardProps) {
-    const { appSettings } = useApp();
+export default function TaskKanbanBoard({ tasks, groups, allGroups, onUpdateTask, onDeleteTask, selectedTasks, onToggleSelection, isDragDisabled = false }: TaskKanbanBoardProps) {
+    const { appSettings, setIsSettingsOpen } = useApp();
     const availableGroups = allGroups || groups;
 
     const kanbanGroups = useMemo(() => {
@@ -48,8 +51,8 @@ export default function TaskKanbanBoard({ tasks, groups, allGroups, onUpdateTask
                         ? "Add some tasks to the groups you've selected for your Kanban board."
                         : "To use the Kanban board, please select which task groups to display as columns in your settings."}
                 </p>
-                 <Button asChild variant="outline" className="mt-4">
-                    <Link href="/settings">Go to Settings</Link>
+                 <Button onClick={() => setIsSettingsOpen(true)} variant="outline" className="mt-4">
+                    Go to Settings
                 </Button>
             </div>
         )
@@ -87,6 +90,9 @@ export default function TaskKanbanBoard({ tasks, groups, allGroups, onUpdateTask
                                                 index={index}
                                                 onUpdate={onUpdateTask}
                                                 onDelete={onDeleteTask}
+                                                isSelected={selectedTasks?.includes(task.id)}
+                                                onToggleSelection={onToggleSelection}
+                                                isDragDisabled={isDragDisabled}
                                             />
                                         ))
                                     ) : (

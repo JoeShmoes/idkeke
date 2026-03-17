@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     
     const res = await fetch(url, {
         headers: {
-            'User-Agent': 'NexarisModuleApp/1.0 (https://nexaris.vercel.app; contact@example.com)',
+            'User-Agent': 'NexarisModuleApp/1.0 (https://app.nexarismedia.online; contact@example.com)',
             'Accept': 'text/html; charset=utf-8; profile="https://www.mediawiki.org/wiki/Specs/HTML/2.1.0"'
         }
     });
@@ -26,8 +26,8 @@ export async function GET(request: Request) {
 
     const html = await res.text();
     
-    // Fix relative links to absolute
-    const fixedHtml = html.replace(/href="\.\//g, 'target="_blank" href="https://en.wikipedia.org/api/rest_v1/page/html/');
+    // Fix relative links to absolute (leave target alone so they open in‑frame)
+    const fixedHtml = html.replace(/href="\.\//g, 'href="https://en.wikipedia.org/api/rest_v1/page/html/');
 
     // Return HTML as text/html or JSON? JSON is safer for the client to handle
     return NextResponse.json({ html: fixedHtml });

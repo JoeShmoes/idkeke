@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useApp } from '@/components/layout/app-provider';
+import { useHover } from '@/components/layout/hover-context';
 
 
 const statusConfig: Record<Client['status'], { label: string; color: string }> = {
@@ -26,6 +27,7 @@ const statusConfig: Record<Client['status'], { label: string; color: string }> =
 
 export default function ClientsPageContent() {
   const { clients, setClients } = useApp();
+  const { setHoveredItem } = useHover();
   const [isClient, setIsClient] = useState(false);
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<Client | undefined>(undefined);
@@ -98,7 +100,19 @@ export default function ClientsPageContent() {
           
           <div className="space-y-4">
             {clients.length > 0 ? clients.map(client => (
-                <Card key={client.id} className="bg-card/50">
+                <Card 
+                    key={client.id} 
+                    className="bg-card/50"
+                    onMouseEnter={() => setHoveredItem({ 
+                        type: 'client', 
+                        data: { 
+                            ...client, 
+                            onEdit: () => handleOpenEditDialog(client),
+                            onDelete: () => handleDeleteClient(client.id)
+                        } 
+                    })}
+                    onMouseLeave={() => setHoveredItem(null)}
+                >
                     <CardContent className="p-4 flex items-start gap-4">
                         <Avatar>
                             <AvatarFallback>{getInitials(client.name)}</AvatarFallback>

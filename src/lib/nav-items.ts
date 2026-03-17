@@ -1,32 +1,38 @@
 
 import type { NavGroup } from './types';
 import { 
-    Home, MessageSquareWarning, CheckSquare, Award, Briefcase, TrendingUp, KanbanSquare, 
-    Users, Search, Notebook, Newspaper, Truck, Palette, File, Cpu, DollarSign, Building, 
-    User, HeartPulse, BookOpen, Network, Bot, GitBranch, PenSquare, Presentation, FileText, FileSpreadsheet
+    Home, MessageSquareWarning, ListTodo, TrendingUp, Briefcase, KanbanSquare, 
+    Users, Microscope, Notebook, Truck, Palette, File, Cpu, Wallet, Building, 
+    User, Activity, GraduationCap, Network, Bot, GitBranch, PenSquare, Presentation, FileText, FileSpreadsheet, PieChart,
+    Archive, Wrench, Lock, Rocket, CalendarDays, Mail
 } from 'lucide-react';
 
 export const iconMap: { [key: string]: React.ElementType } = {
     Home,
+    Mail,
     MessageSquareWarning,
-    CheckSquare,
-    Award,
+    ListTodo,
+    CheckSquare: ListTodo, // Map old to new
+    Award: TrendingUp, // Map old to new
     Briefcase,
     TrendingUp,
     KanbanSquare,
     Users,
-    Search,
+    Search: Microscope, // Map old to new
+    Microscope,
     Notebook,
-    Newspaper,
     Truck,
     Palette,
     File,
     Cpu,
-    DollarSign,
+    DollarSign: Wallet, // Map old to new
+    Wallet,
     Building,
     User,
-    HeartPulse,
-    BookOpen,
+    HeartPulse: Activity, // Map old to new
+    Activity,
+    BookOpen: GraduationCap, // Map old to new
+    GraduationCap,
     Network,
     Bot,
     GitBranch,
@@ -34,61 +40,68 @@ export const iconMap: { [key: string]: React.ElementType } = {
     Presentation,
     FileText,
     FileSpreadsheet,
+    PieChart,
+    Archive,
+    Wrench,
+    Lock,
+    Rocket,
+    CalendarDays
 };
+
+export type IconName = keyof typeof iconMap;
 
 export const allNavItems: NavGroup[] = [
   {
-    label: 'Alfred',
+    label: 'Alfred AI',
     items: [
-      { href: '/ai-room', label: 'AI Room', icon: 'Bot' },
+      { href: '/ai-room', label: 'Alfred', icon: 'Bot' },
     ],
   },
   {
     label: 'Core Control',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: 'Home' },
-      { href: '/tasks', label: 'Tasks', icon: 'CheckSquare' },
+      { href: '/tasks', label: 'Tasks', icon: 'ListTodo' },
+      { href: '/collaboration', label: 'Collaboration', icon: 'Presentation' },
+      { href: '/calendar', label: 'Calendar', icon: 'CalendarDays' },
+      { href: '/sheets', label: 'Spreadsheets', icon: 'FileSpreadsheet' },
     ],
   },
   {
     label: 'Growth & Strategy',
     items: [
-             { href: '/growth-hub', label: 'Growth Hub', icon: 'Award' },
-             { href: '/business', label: 'Business', icon: 'Briefcase' },
-             { href: '/project-board', label: 'Projects', icon: 'KanbanSquare' },
-             { href: '/clients', label: 'Clients', icon: 'Users' },
+      { href: '/growth-hub', label: 'Growth Hub', icon: 'TrendingUp' },
+      { href: '/business', label: 'Business', icon: 'Briefcase' },
+      { href: '/project-board', label: 'Projects', icon: 'KanbanSquare' },
+      { href: '/clients', label: 'Clients', icon: 'Users' },
+    ],
+  },
+  {
+    label: 'Research & Knowledge',
+    items: [
+      { href: '/research', label: 'Research', icon: 'Microscope' },
+      { href: '/notes', label: 'Notes', icon: 'Notebook' },
+    ],
+  },
+  {
+    label: 'Brand',
+    items: [
+        { href: '/brand-room', label: 'Brand Room', icon: 'Palette' },
     ]
   },
   {
-    label: 'Research & Development',
+    label: 'Finance & Assets',
     items: [
-      { href: '/research', label: 'Research', icon: 'Search' },
-      { href: '/notes', label: 'Notes', icon: 'Notebook' },
-      { href: '/sheets', label: 'Sheets', icon: 'FileSpreadsheet' },
-      { href: '/news', label: 'News', icon: 'Newspaper' },
-      { href: '/workshop-fabrication-garage', label: 'Workshop', icon: 'Truck' },
-    ],
+        { href: '/budgeting', label: 'Budgeting', icon: 'Wallet' },
+        { href: '/asset-tracker', label: 'Assets', icon: 'Building' },
+        { href: '/file-vault', label: 'File Vault', icon: 'Lock' },
+    ]
   },
-     {
-        label: 'Operations & Systems',
-        items: [
-            { href: '/brand-room', label: 'Brand Room', icon: 'Palette' },
-          ],
-    },
-    {
-        label: "Finance & Assets",
-        items: [
-            { href: '/finance', label: 'Finance', icon: 'DollarSign' },
-            { href: '/asset-tracker', label: 'Assets', icon: 'Building' },
-            { href: '/file-vault', label: 'File Vault', icon: 'File' },
-        ]
-    },
-    {
-        label: "Personal Development",
-        items: [
-          { href: '/health', label: 'Health', icon: 'HeartPulse' },
-          { href: '/learning', label: 'Learning', icon: 'BookOpen' },
-          { href: '/networking', label: 'Networking', icon: 'Network' },
-        ]
-    }
+  {
+    label: 'Connections & Learning',
+    items: [
+        { href: '/networking', label: 'Networking', icon: 'Network' },
+        { href: '/learning', label: 'Learning', icon: 'GraduationCap' },
+    ]
+  },
 ];

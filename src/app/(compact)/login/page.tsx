@@ -29,8 +29,18 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
+  const [emailSent, setEmailSent] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
   useEffect(() => {
     setIsClient(true);
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      if (hash.includes('type=recovery')) {
+        router.replace('/reset');
+        return;
+      }
+    }
     if (userProfile.hasCompletedSetup) {
       router.push('/dashboard');
       return;
@@ -108,11 +118,29 @@ export default function LoginPage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              full_name: `${firstName} ${lastName}`,
+              first_name: firstName,
+              last_name: lastName,
+            }
+          }
         });
 
         if (error) throw error;
 
-        if (data.user) {
+        // Check if session is missing (implies email confirmation required)
+        if (data.user && !data.session) {
+            toast({
+                title: 'Check your email',
+                description: 'We have sent you a confirmation link. Please click it to verify your account before logging in.',
+                duration: 6000,
+            });
+            setLoading(false);
+            return;
+        }
+
+        if (data.user && data.session) {
           // Extract name from email or use email
           const fullName = `${firstName} ${lastName}`;
           setUserProfile({
@@ -164,6 +192,23 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error('Auth error:', error);
+      
+      // Handle Email Not Confirmed -> Soft Login
+      if (error.message && (error.message.includes('Email not confirmed') || error.message.includes('Email link is invalid'))) {
+           toast({
+            title: 'Email not verified',
+            description: 'Logging you in with limited access (Offline Mode).',
+          });
+          
+          setUserProfile({
+            name: email.split('@')[0] || 'User',
+            email: email,
+            hasCompletedSetup: true,
+          });
+          router.push('/dashboard');
+          return;
+      }
+
       toast({
         variant: 'destructive',
         title: isSignUp ? 'Sign Up Failed' : 'Sign In Failed',
@@ -179,28 +224,32 @@ export default function LoginPage() {
       toast({
         variant: 'destructive',
         title: 'Email Required',
-        description: 'Please enter your email address first.',
+        description: 'Please enter your email address to reset your password.',
       });
       return;
     }
 
+    setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}`,
       });
 
       if (error) throw error;
 
       toast({
-        title: 'Password Reset Email Sent',
-        description: 'Check your email for password reset instructions.',
+        title: 'Check your email',
+        description: 'We have sent you a password reset link.',
       });
+      setIsResetting(false);
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'Failed to send password reset email.',
+        description: error.message,
       });
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -240,6 +289,7 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {!emailSent && (
         <form onSubmit={handleSubmit} className="space-y-6">
           {isSignUp && (
             <>
@@ -289,8 +339,23 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    {!isSignUp && (
+                        <Button 
+                            variant="link" 
+                            className="p-0 h-auto text-xs text-muted-foreground hover:text-primary"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleForgotPassword();
+                            }}
+                            disabled={loading}
+                        >
+                            Forgot Password?
+                        </Button>
+                    )}
+                </div>
+                <div className="relative">
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
@@ -393,7 +458,9 @@ export default function LoginPage() {
             )}
           </Button>
         </form>
+        )}
 
+        {!emailSent && (
         <div className="text-center text-sm text-muted-foreground">
           {isSignUp ? (
             <>
@@ -421,6 +488,7 @@ export default function LoginPage() {
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   );

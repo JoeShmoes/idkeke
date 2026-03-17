@@ -6,7 +6,11 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import type { Project } from '@/lib/types';
 import AddProjectDialog from '@/components/projects/add-project-dialog';
+import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger } from '@/components/ui/context-menu';
 import { useApp } from '@/components/layout/app-provider';
+import { useLevel } from '@/hooks/use-level';
 import { DragDropContext, type DropResult } from 'react-beautiful-dnd';
 import ProjectKanbanBoard from '@/components/projects/project-kanban-board';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,6 +19,7 @@ type ProjectStatus = 'not-started' | 'in-progress' | 'completed';
 
 export default function ProjectBoardPage() {
   const { projects, setProjects } = useApp();
+  const { currentLevel } = useLevel();
   const [isClient, setIsClient] = useState(false);
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | undefined>(undefined);
@@ -83,11 +88,7 @@ export default function ProjectBoardPage() {
 
   return (
     <>
-      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 pb-4 flex justify-between items-center">
-          <div>
-              <h1 className="text-2xl font-bold">Project Board</h1>
-              <p className="text-muted-foreground">Drag and drop projects to change their status.</p>
-          </div>
+      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 pt-6 pb-4 flex justify-end items-center">
           <Button onClick={handleOpenAddDialog}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Project
@@ -109,6 +110,7 @@ export default function ProjectBoardPage() {
         onOpenChange={setIsAddProjectOpen}
         onAddProject={projectToEdit ? handleEditProject : handleAddProject}
         projectToEdit={projectToEdit}
+        currentLevel={currentLevel}
       />
     </>
   );

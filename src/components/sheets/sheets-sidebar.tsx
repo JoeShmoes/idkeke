@@ -63,8 +63,8 @@ export default function SheetsSidebar({
                   : 'hover:bg-background/50 border border-transparent'
               )}
             >
-              <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-md">
-                 <FileSpreadsheet className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div className="p-2 text-primary">
+                 <FileSpreadsheet className="h-6 w-6" />
               </div>
               <div className="flex-1 overflow-hidden">
                 <h3 className="font-medium text-sm truncate">{sheet.name}</h3>

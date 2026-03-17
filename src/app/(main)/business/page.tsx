@@ -3,10 +3,17 @@
 
 import { useApp } from '@/components/layout/app-provider';
 import KpiCard from '@/components/dashboard/kpi-card';
-import { Users, ClipboardCheck } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { useRouter } from 'next/navigation';
+import { Users, ClipboardCheck, FolderOpen, ExternalLink, Copy, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, copyToClipboard } from '@/lib/utils';
 
 const projectStatusConfig: Record<string, { label: string; color: string }> = {
     'not-started': { label: 'Not Started', color: 'bg-gray-500' },
@@ -22,9 +29,18 @@ const clientStatusConfig: Record<string, { label: string; color: string }> = {
 
 
 export default function BusinessPage() {
-  const { clients, projects } = useApp();
+  const { clients, setClients, projects, setProjects } = useApp();
+  const router = useRouter();
 
   const activeProjects = projects.filter(p => p.status === 'in-progress').length;
+
+  const handleDeleteProject = (id: string) => {
+    setProjects(prev => prev.filter(p => p.id !== id));
+  };
+
+  const handleDeleteClient = (id: string) => {
+    setClients(prev => prev.filter(c => c.id !== id));
+  };
 
   return (
     <div className="space-y-8">
@@ -42,16 +58,30 @@ export default function BusinessPage() {
           <CardContent>
             <div className="space-y-4">
               {projects.slice(0, 5).map(project => (
-                <div key={project.id} className="flex items-start justify-between">
-                  <div className="flex-1 pr-2">
-                    <p className="font-medium">{project.name}</p>
-                    <p className="text-sm text-muted-foreground">{project.description}</p>
-                  </div>
-                  <Badge variant="outline" className="h-6 whitespace-nowrap">
-                    <div className={cn("h-2 w-2 rounded-full mr-2", projectStatusConfig[project.status]?.color)}></div>
-                    {projectStatusConfig[project.status]?.label}
-                  </Badge>
-                </div>
+                <ContextMenu key={project.id}>
+                    <ContextMenuTrigger>
+                        <div className="flex items-start justify-between p-2 rounded-md hover:bg-muted/50 transition-colors cursor-default">
+                        <div className="flex-1 pr-2">
+                            <p className="font-medium">{project.name}</p>
+                            <p className="text-sm text-muted-foreground line-clamp-1">{project.description}</p>
+                        </div>
+                        <Badge variant="outline" className="h-6 whitespace-nowrap">
+                            <div className={cn("h-2 w-2 rounded-full mr-2", projectStatusConfig[project.status]?.color)}></div>
+                            {projectStatusConfig[project.status]?.label}
+                        </Badge>
+                        </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto">
+                        <ContextMenuItem onClick={() => router.push('/project-board')}>
+                            <FolderOpen className="mr-2 h-4 w-4" />
+                            Go to Board
+                        </ContextMenuItem>
+                         <ContextMenuItem onClick={() => handleDeleteProject(project.id)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Project
+                        </ContextMenuItem>
+                    </ContextMenuContent>
+                </ContextMenu>
               ))}
               {projects.length === 0 && <p className="text-sm text-muted-foreground text-center">No projects yet.</p>}
             </div>
@@ -66,16 +96,26 @@ export default function BusinessPage() {
           <CardContent>
             <div className="space-y-4">
               {clients.slice(0, 5).map(client => (
-                <div key={client.id} className="flex items-start justify-between">
-                   <div className="flex-1 pr-2">
-                    <p className="font-medium">{client.name}</p>
-                    <p className="text-sm text-muted-foreground">{client.company}</p>
-                  </div>
-                   <Badge variant="outline" className="h-6 whitespace-nowrap">
-                    <div className={cn("h-2 w-2 rounded-full mr-2", clientStatusConfig[client.status]?.color)}></div>
-                    {clientStatusConfig[client.status]?.label}
-                  </Badge>
-                </div>
+                <ContextMenu key={client.id}>
+                    <ContextMenuTrigger>
+                        <div className="flex items-start justify-between p-2 rounded-md hover:bg-muted/50 transition-colors cursor-default">
+                        <div className="flex-1 pr-2">
+                            <p className="font-medium">{client.name}</p>
+                            <p className="text-sm text-muted-foreground">{client.company}</p>
+                        </div>
+                        <Badge variant="outline" className="h-6 whitespace-nowrap">
+                            <div className={cn("h-2 w-2 rounded-full mr-2", clientStatusConfig[client.status]?.color)}></div>
+                            {clientStatusConfig[client.status]?.label}
+                        </Badge>
+                        </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-56">
+                        <ContextMenuItem onClick={() => handleDeleteClient(client.id)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Client
+                        </ContextMenuItem>
+                    </ContextMenuContent>
+                </ContextMenu>
               ))}
                {clients.length === 0 && <p className="text-sm text-muted-foreground text-center">No clients yet.</p>}
             </div>

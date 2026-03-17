@@ -17,7 +17,7 @@ import type { Project } from '@/lib/types';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
-import { Link as LinkIcon, X } from 'lucide-react';
+import { Link as LinkIcon, X, Copy } from 'lucide-react';
 import { Badge } from '../ui/badge';
 
 type ProjectStatus = 'not-started' | 'in-progress' | 'completed';
@@ -27,15 +27,46 @@ interface AddProjectDialogProps {
   onOpenChange: (isOpen: boolean) => void;
   onAddProject: (project: Omit<Project, 'id'>) => void;
   projectToEdit?: Project;
+  currentLevel?: number;
 }
 
-export default function AddProjectDialog({ isOpen, onOpenChange, onAddProject, projectToEdit }: AddProjectDialogProps) {
+const PROJECT_TEMPLATES = [
+    {
+        id: 'dev',
+        name: 'Software Development',
+        description: 'Standard agile software development project.',
+        links: [{ title: 'Repo', url: 'https://github.com' }, { title: 'Board', url: 'https://jira.com' }]
+    },
+    {
+        id: 'marketing',
+        name: 'Marketing Campaign',
+        description: 'Quarterly marketing initiative.',
+        links: [{ title: 'Analytics', url: 'https://analytics.google.com' }, { title: 'Assets', url: 'https://drive.google.com' }]
+    },
+    {
+        id: 'event',
+        name: 'Event Planning',
+        description: 'Logistics for upcoming event.',
+        links: [{ title: 'Venue', url: 'https://maps.google.com' }, { title: 'Schedule', url: 'https://calendar.google.com' }]
+    }
+];
+
+export default function AddProjectDialog({ isOpen, onOpenChange, onAddProject, projectToEdit, currentLevel = 0 }: AddProjectDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ProjectStatus>('not-started');
   const [links, setLinks] = useState<{ title: string; url: string }[]>([]);
   const [currentLinkTitle, setCurrentLinkTitle] = useState('');
   const [currentLinkUrl, setCurrentLinkUrl] = useState('');
+
+  const applyTemplate = (templateId: string) => {
+    const template = PROJECT_TEMPLATES.find(t => t.id === templateId);
+    if (template) {
+        setName(template.name);
+        setDescription(template.description);
+        setLinks(template.links);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -85,6 +116,26 @@ export default function AddProjectDialog({ isOpen, onOpenChange, onAddProject, p
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {!projectToEdit && currentLevel >= 30 && (
+                <div className="space-y-2">
+                    <Label>Project Template <Badge variant="secondary" className="ml-2 text-[10px]">Level 30 Unlocked</Badge></Label>
+                    <Select onValueChange={applyTemplate}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a template (Optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {PROJECT_TEMPLATES.map(t => (
+                                <SelectItem key={t.id} value={t.id}>
+                                    <div className="flex items-center gap-2">
+                                        <Copy className="h-4 w-4 text-muted-foreground" />
+                                        <span>{t.name}</span>
+                                    </div>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="name">Project Name</Label>
               <Input 

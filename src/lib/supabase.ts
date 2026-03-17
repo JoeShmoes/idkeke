@@ -16,8 +16,14 @@ export const supabase = configured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : ({
       auth: {
+        async getUser() {
+          return { data: { user: null }, error: null };
+        },
         async getSession() {
           return { data: { session: null }, error: null };
+        },
+        onAuthStateChange() {
+            return { data: { subscription: { unsubscribe: () => {} } } };
         },
         async signUp() {
           const error = new Error(
@@ -37,5 +43,20 @@ export const supabase = configured
           );
           return { data: null, error };
         },
+      },
+      from() {
+        return {
+          select: () => ({ eq: () => ({ single: () => ({ data: null, error: null }), data: [] }) }),
+          upsert: () => ({ data: null, error: null }),
+        };
+      },
+      channel() {
+        return {
+          on: () => ({ subscribe: () => {} }),
+        };
+      },
+      removeChannel() {},
+      rpc() {
+        return { data: null, error: new Error('Supabase configuration missing.') };
       },
     } as any);

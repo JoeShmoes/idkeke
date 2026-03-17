@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/context-menu';
 import {
   ArrowLeft, ArrowRight, Home, Settings, Moon, Sun, PanelLeft, Plus,
-  Notebook, CheckSquare, Search, File, Edit, Trash2, CheckCircle,
+  Notebook, CheckSquare, Search, File, Edit, Trash2, CheckCircle, DollarSign, Package, Building,
 } from 'lucide-react';
 import { useApp } from './app-provider';
 import type { Theme, Task, Note, Project, VaultFile, VaultFolder } from '@/lib/types';
@@ -25,7 +25,7 @@ import { useState } from 'react';
 
 export default function GlobalContextMenu({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { appSettings, setAppSettings, isDataLoaded, setTasks, setNotes } = useApp();
+  const { appSettings, setAppSettings, isDataLoaded, setTasks, setNotes, setIsSettingsOpen } = useApp();
   const { toggleSidebar } = useSidebar();
   const { hoveredItem } = useHover();
   const { setOpen } = useCommandPalette();
@@ -71,7 +71,7 @@ export default function GlobalContextMenu({ children }: { children: React.ReactN
   
   const onOpenChange = (open: boolean) => {
     if (open) {
-      setContextItem(hoveredItem);
+      setContextItem(hoveredItem || { type: 'default' });
     }
   };
 
@@ -84,9 +84,17 @@ export default function GlobalContextMenu({ children }: { children: React.ReactN
       <ContextMenuContent className="w-64">
         {contextItem?.type === 'task' && (
             <>
+                <ContextMenuItem onClick={() => contextItem.data.onEdit()}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit Task</span>
+                </ContextMenuItem>
                 <ContextMenuItem onClick={handleToggleTask}>
                     <CheckCircle className="mr-2 h-4 w-4" />
                     <span>Mark as {(contextItem.data as Task).completed ? 'Incomplete' : 'Complete'}</span>
+                </ContextMenuItem>
+                <ContextMenuItem className="text-destructive" onClick={() => contextItem.data.onDelete()}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Task</span>
                 </ContextMenuItem>
                 <ContextMenuSeparator />
             </>
@@ -128,6 +136,90 @@ export default function GlobalContextMenu({ children }: { children: React.ReactN
                 <ContextMenuItem className="text-destructive" onClick={() => contextItem.data.onDelete({id: contextItem.data.id, type: contextItem.data.type})}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     <span>Delete</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+            </>
+        )}
+
+        {contextItem?.type === 'learning' && (
+             <>
+                <ContextMenuItem onClick={() => contextItem.data.onEdit()}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit Resource</span>
+                </ContextMenuItem>
+                <ContextMenuItem className="text-destructive" onClick={() => contextItem.data.onDelete()}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Resource</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+            </>
+        )}
+
+        {contextItem?.type === 'contact' && (
+             <>
+                <ContextMenuItem onClick={() => contextItem.data.onEdit()}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit Contact</span>
+                </ContextMenuItem>
+                <ContextMenuItem className="text-destructive" onClick={() => contextItem.data.onDelete()}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Contact</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+            </>
+        )}
+
+        {contextItem?.type === 'client' && (
+             <>
+                <ContextMenuItem onClick={() => contextItem.data.onEdit()}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit Client</span>
+                </ContextMenuItem>
+                <ContextMenuItem className="text-destructive" onClick={() => contextItem.data.onDelete()}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Client</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+            </>
+        )}
+
+        {contextItem?.type === 'account' && (
+             <>
+                <ContextMenuItem onClick={() => contextItem.data.onEdit()}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit Account</span>
+                </ContextMenuItem>
+                <ContextMenuItem className="text-destructive" onClick={() => contextItem.data.onDelete()}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Account</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+            </>
+        )}
+
+        {contextItem?.type === 'transaction' && (
+             <>
+                <ContextMenuItem onClick={() => contextItem.data.onEdit()}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit Transaction</span>
+                </ContextMenuItem>
+                <ContextMenuItem className="text-destructive" onClick={() => contextItem.data.onDelete()}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Transaction</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+            </>
+        )}
+
+        {contextItem?.type === 'asset' && (
+             <>
+                <ContextMenuItem onClick={() => contextItem.data.onEdit()}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit Asset</span>
+                </ContextMenuItem>
+                <ContextMenuItem className="text-destructive" onClick={() => contextItem.data.onDelete()}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Asset</span>
                 </ContextMenuItem>
                 <ContextMenuSeparator />
             </>
@@ -184,7 +276,7 @@ export default function GlobalContextMenu({ children }: { children: React.ReactN
           <ThemeIcon className="mr-2 h-4 w-4" />
           <span>Cycle Theme</span>
         </ContextMenuItem>
-        <ContextMenuItem onClick={() => handleGoTo('/settings')}>
+        <ContextMenuItem onClick={() => setIsSettingsOpen(true)}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </ContextMenuItem>

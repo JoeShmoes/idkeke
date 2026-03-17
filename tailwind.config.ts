@@ -2,6 +2,7 @@
 import type {Config} from 'tailwindcss';
 
 export default {
+  // Nexaris Module App Configuration
   darkMode: ['class'],
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',

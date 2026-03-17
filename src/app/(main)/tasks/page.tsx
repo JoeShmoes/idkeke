@@ -1,18 +1,19 @@
 
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CheckSquare, Trash2, LayoutGrid, View, KanbanSquare } from 'lucide-react';
+import { PlusCircle, CheckSquare, Trash2, LayoutGrid, View, KanbanSquare, Sliders, X, AlertCircle } from 'lucide-react';
 import { useApp } from '@/components/layout/app-provider';
 import TaskList from '@/components/tasks/task-list';
 import AddTaskDialog from '@/components/tasks/add-task-dialog';
 import AddGroupDialog from '@/components/tasks/add-group-dialog';
+import BulkEditDialog, { BulkUpdates } from '@/components/tasks/bulk-edit-dialog';
 import type { Task, TaskGroup, TaskView } from '@/lib/types';
 import { DragDropContext, type DropResult } from 'react-beautiful-dnd';
 import { allAchievements } from '@/lib/achievements';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { isAfter, isBefore, isToday, isTomorrow, startOfToday } from 'date-fns';
 import TaskListGroupByDate from '@/components/tasks/task-list-group-by-date';
 import TaskKanbanBoard from '@/components/tasks/task-kanban-board';
@@ -28,26 +29,99 @@ export default function TasksPage() {
   const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   
   const [taskView, setTaskView] = useState<TaskView>('default');
   const [filter, setFilter] = useState<TaskFilter>('all');
   const [sort, setSort] = useState<TaskSort>('default');
   const [isClient, setIsClient] = useState(false);
+  const [groupPagination, setGroupPagination] = useState<Record<string, number>>({});
+  // Reorder Mode State
+  // We moved reordering state to the group level in TaskList
+
+  // Selection State
+  const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number; isSelecting: boolean } | null>(null);
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsClient(true);
     setTaskView(appSettings.tasks.defaultView || 'default');
   }, [appSettings.tasks.defaultView]);
 
+  const handlePageChange = (groupId: string, newPage: number) => {
+    setGroupPagination(prev => ({ ...prev, [groupId]: newPage }));
+  };
+
   const handleAddTask = (newTask: Omit<Task, 'id' | 'completed' | 'createdAt' | 'order'>) => {
+    const groupTasks = tasks.filter(t => t.groupId === newTask.groupId);
+    const maxOrder = groupTasks.length > 0 ? Math.max(...groupTasks.map(t => t.order || 0)) : -1;
+
     const taskToAdd: Task = {
       ...newTask,
       id: Date.now().toString(),
       completed: false,
       createdAt: new Date().toISOString(),
-      order: tasks.filter(t => t.groupId === newTask.groupId).length,
+      order: maxOrder + 1,
     };
     setTasks(prev => [taskToAdd, ...prev]);
+  };
+
+  // Move Group
+  const handleMoveGroup = (groupId: string, direction: 'up' | 'down') => {
+    // Find the group
+    const groupIndex = taskGroups.findIndex(g => g.id === groupId);
+    if (groupIndex === -1) return;
+
+    const newGroups = [...taskGroups];
+    const swapIndex = direction === 'up' ? groupIndex - 1 : groupIndex + 1;
+
+    if (swapIndex < 0 || swapIndex >= newGroups.length) return;
+
+    // Swap
+    [newGroups[groupIndex], newGroups[swapIndex]] = [newGroups[swapIndex], newGroups[groupIndex]];
+
+    // Update orders
+    const updates = newGroups.map((g, index) => ({
+      id: g.id,
+      order: index
+    }));
+
+    setTaskGroups(newGroups);
+  };
+
+  // Move Task
+  const handleMoveTask = (taskId: string, direction: 'up' | 'down') => {
+    setTasks(prev => {
+        const newTasks = [...prev];
+        const taskIndex = newTasks.findIndex(t => t.id === taskId);
+        if (taskIndex === -1) return prev;
+
+        const task = newTasks[taskIndex];
+        
+        // Find adjacent task in the same group to swap with
+        const groupTasks = newTasks
+            .filter(t => t.groupId === task.groupId)
+            .sort((a,b) => (a.order || 0) - (b.order || 0));
+            
+        const currentGroupIndex = groupTasks.findIndex(t => t.id === taskId);
+        
+        if (direction === 'up' && currentGroupIndex > 0) {
+            const prevTask = groupTasks[currentGroupIndex - 1];
+            // Swap orders
+            const tempOrder = task.order || 0;
+            task.order = prevTask.order || 0;
+            prevTask.order = tempOrder;
+        } else if (direction === 'down' && currentGroupIndex < groupTasks.length - 1) {
+            const nextTask = groupTasks[currentGroupIndex + 1];
+            // Swap orders
+            const tempOrder = task.order || 0;
+            task.order = nextTask.order || 0;
+            nextTask.order = tempOrder;
+        }
+
+        return [...newTasks];
+    });
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
@@ -55,8 +129,22 @@ export default function TasksPage() {
   };
 
   const handleDeleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(t => t.id !== taskId));
+    setItemToDelete(taskId);
+    setIsBulkDeleteConfirmOpen(true);
   }
+
+  const confirmDelete = () => {
+    if (itemToDelete) {
+        setTasks(prev => prev.filter(t => t.id !== itemToDelete));
+        setItemToDelete(null);
+        // Also remove from selection if present
+        setSelectedTasks(prev => prev.filter(id => id !== itemToDelete));
+    } else {
+        setTasks(prev => prev.filter(task => !selectedTasks.includes(task.id)));
+        setSelectedTasks([]);
+    }
+    setIsBulkDeleteConfirmOpen(false);
+  };
 
   const handleAddGroup = (groupName: string) => {
     const newGroup: TaskGroup = {
@@ -77,67 +165,17 @@ export default function TasksPage() {
     setTaskGroups(prev => prev.filter(g => g.id !== groupId));
   };
   
+  // Check if any filters are active (which invalidates manual reordering)
+  // We allow reordering even if hideCompletedTasks is on, but NOT if a specific sort is applied
+  const areFiltersActive = useMemo(() => {
+    return filter !== 'all' || sort !== 'default';
+  }, [filter, sort]);
+
+
+
   const onDragEnd = (result: DropResult) => {
-    const { destination, source, draggableId, type } = result;
-
-    if (!destination) return;
-
-    if (destination.droppableId === source.droppableId && destination.index === source.index) {
-        return;
-    }
-    
-    let newTasks = Array.from(tasks);
-
-    const taskToMove = newTasks.find(t => t.id === draggableId);
-    if (!taskToMove) return;
-    
-    // Find the actual task object in the main array to modify it
-    const taskInMainList = newTasks.find(t => t.id === draggableId)!;
-
-    if (type === 'GROUP') {
-        const [reorderedGroup] = taskGroups.splice(source.index, 1);
-        taskGroups.splice(destination.index, 0, reorderedGroup);
-        setTaskGroups([...taskGroups]);
-        return;
-    }
-
-    if (source.droppableId === destination.droppableId) {
-        // Re-ordering in the same group
-        const sourceTasks = newTasks.filter(t => t.groupId === source.droppableId).sort((a,b) => (a.order || 0) - (b.order || 0));
-        const [moved] = sourceTasks.splice(source.index, 1);
-        sourceTasks.splice(destination.index, 0, moved);
-        
-        // Update order for this group
-        sourceTasks.forEach((t, index) => {
-            const taskToUpdate = newTasks.find(nt => nt.id === t.id);
-            if (taskToUpdate) taskToUpdate.order = index;
-        });
-    } else {
-        // Moving to a different group
-        taskInMainList.groupId = destination.droppableId;
-        
-        const sourceTasks = newTasks.filter(t => t.groupId === source.droppableId).sort((a,b) => (a.order || 0) - (b.order || 0));
-        const destTasks = newTasks.filter(t => t.groupId === destination.droppableId).sort((a,b) => (a.order || 0) - (b.order || 0));
-
-        // Find and remove the moved task from the source tasks array
-        const movedTaskIndex = sourceTasks.findIndex(t => t.id === draggableId);
-        if (movedTaskIndex > -1) {
-            const [moved] = sourceTasks.splice(movedTaskIndex, 1);
-            destTasks.splice(destination.index, 0, moved);
-        }
-        
-        // Update order for both source and destination groups
-        sourceTasks.forEach((t, index) => {
-            const taskToUpdate = newTasks.find(nt => nt.id === t.id);
-            if (taskToUpdate) taskToUpdate.order = index;
-        });
-        destTasks.forEach((t, index) => {
-            const taskToUpdate = newTasks.find(nt => nt.id === t.id);
-            if (taskToUpdate) taskToUpdate.order = index;
-        });
-    }
-    
-    setTasks(newTasks);
+    // Drag and drop disabled as per user request. Users must use the reorder feature.
+    return;
   };
 
 
@@ -177,16 +215,116 @@ export default function TasksPage() {
     return level;
   }, [appData, tasks]);
 
-  const handleToggleTaskSelection = (taskId: string) => {
-    setSelectedTasks(prev => 
-        prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
-    );
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left click
+    if ((e.target as HTMLElement).closest('[data-selectable]')) return; // Let item click handle it
+    
+    // Prevent selection if clicking on interactive elements
+    if ((e.target as HTMLElement).closest('button, a, input, [role="checkbox"], [role="button"]')) return;
+
+    setSelectionBox({
+        startX: e.clientX,
+        startY: e.clientY,
+        currentX: e.clientX,
+        currentY: e.clientY,
+        isSelecting: true
+    });
+    
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        setSelectedTasks([]);
+        setLastSelectedId(null);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!selectionBox?.isSelecting) return;
+
+    setSelectionBox(prev => prev ? ({ ...prev, currentX: e.clientX, currentY: e.clientY }) : null);
+
+    const selectionRect = {
+        left: Math.min(selectionBox.startX, e.clientX),
+        top: Math.min(selectionBox.startY, e.clientY),
+        right: Math.max(selectionBox.startX, e.clientX),
+        bottom: Math.max(selectionBox.startY, e.clientY)
+    };
+
+    const newSelectedIds = new Set(e.ctrlKey || e.metaKey ? selectedTasks : []);
+    
+    // Find all selectable items
+    const items = document.querySelectorAll('[data-selectable]');
+    items.forEach(item => {
+        const itemRect = item.getBoundingClientRect();
+        
+        if (
+            selectionRect.left < itemRect.right &&
+            selectionRect.right > itemRect.left &&
+            selectionRect.top < itemRect.bottom &&
+            selectionRect.bottom > itemRect.top
+        ) {
+            const id = item.getAttribute('data-id');
+            if (id) newSelectedIds.add(id);
+        }
+    });
+    
+    setSelectedTasks(Array.from(newSelectedIds));
+  };
+
+  const handleMouseUp = () => {
+    if (selectionBox?.isSelecting) {
+        setSelectionBox(null);
+    }
+  };
+
+  const handleToggleTaskSelection = (taskId: string, e?: React.MouseEvent) => {
+    if (e && e.shiftKey && lastSelectedId) {
+        const allTaskIds = filteredAndSortedTasks.map(t => t.id);
+        const startIndex = allTaskIds.indexOf(lastSelectedId);
+        const endIndex = allTaskIds.indexOf(taskId);
+        
+        if (startIndex !== -1 && endIndex !== -1) {
+            const start = Math.min(startIndex, endIndex);
+            const end = Math.max(startIndex, endIndex);
+            const rangeIds = allTaskIds.slice(start, end + 1);
+            
+            setSelectedTasks(prev => {
+                const newSet = new Set(prev);
+                rangeIds.forEach(id => newSet.add(id));
+                return Array.from(newSet);
+            });
+            return;
+        }
+    }
+
+    if (e && (e.ctrlKey || e.metaKey)) {
+        setSelectedTasks(prev => 
+            prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
+        );
+        setLastSelectedId(taskId);
+    } else {
+        setSelectedTasks([taskId]);
+        setLastSelectedId(taskId);
+    }
   };
 
   const handleBulkDelete = () => {
-    setTasks(prev => prev.filter(task => !selectedTasks.includes(task.id)));
+    // Deprecated in favor of confirmDelete but keeping for reference if needed, 
+    // actually we should just remove this function or alias it if it was used elsewhere.
+    // But since it was only used in the dialog, we can remove it.
+  };
+
+  const handleBulkUpdate = (updates: BulkUpdates) => {
+    setTasks(prev => prev.map(task => {
+        if (!selectedTasks.includes(task.id)) return task;
+        
+        return {
+            ...task,
+            ...(updates.completed !== undefined && { completed: updates.completed }),
+            ...(updates.groupId && { groupId: updates.groupId }),
+            ...(updates.dueDate !== undefined && { dueDate: updates.dueDate })
+        };
+    }));
     setSelectedTasks([]);
-    setIsBulkDeleteConfirmOpen(false);
+    setIsBulkEditOpen(false);
   };
 
   const isBulkActionsUnlocked = currentLevel >= 15;
@@ -194,7 +332,9 @@ export default function TasksPage() {
   const filteredAndSortedTasks = useMemo(() => {
     let newTasks = [...tasks];
 
-    if (filter === 'completed') {
+    if (appSettings.tasks.hideCompletedTasks && filter !== 'completed') {
+      newTasks = newTasks.filter(t => !t.completed);
+    } else if (filter === 'completed') {
       newTasks = newTasks.filter(t => t.completed);
     } else if (filter === 'incomplete') {
       newTasks = newTasks.filter(t => !t.completed);
@@ -211,6 +351,9 @@ export default function TasksPage() {
       newTasks.sort((a,b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } else if (sort === 'createdAt-desc') {
        newTasks.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+       // Default sort by order to ensure consistent indexing
+       newTasks.sort((a,b) => (a.order || 0) - (b.order || 0));
     }
 
     return newTasks;
@@ -248,11 +391,50 @@ export default function TasksPage() {
         { title: 'Overdue', tasks: overdue, color: 'text-destructive' },
         { title: 'Due Today', tasks: dueToday, color: 'text-blue-500' },
         { title: 'Due Tomorrow', tasks: dueTomorrow, color: 'text-purple-500' },
-        { title: 'Upcoming', tasks: upcoming, color: 'text-muted-foreground' },
-        { title: 'No Due Date', tasks: noDueDate, color: 'text-muted-foreground' },
+        { title: 'Upcoming', tasks: upcoming, color: 'text-foreground' },
+        { title: 'No Due Date', tasks: noDueDate, color: 'text-foreground' },
     ].filter(group => group.tasks.length > 0);
 
   }, [filteredAndSortedTasks]);
+
+  const groupedTasks = useMemo(() => {
+    return taskGroups.map(group => ({
+        id: group.id,
+        name: group.name,
+        tasks: filteredAndSortedTasks.filter(t => t.groupId === group.id)
+    }));
+  }, [taskGroups, filteredAndSortedTasks]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore shortcuts if user is typing in an input/textarea
+      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Delete: Ctrl + Shift + Backspace OR Delete key
+      if ((e.ctrlKey && e.shiftKey && e.key === 'Backspace') || e.key === 'Delete') {
+        if (selectedTasks.length > 0) {
+          e.preventDefault();
+          setItemToDelete(null); // Ensure we are doing bulk delete
+          setIsBulkDeleteConfirmOpen(true);
+        }
+      }
+      // Select All: Ctrl + A
+      if (e.ctrlKey && e.key === 'a') {
+        e.preventDefault();
+        const allTaskIds = filteredAndSortedTasks.map(t => t.id);
+        setSelectedTasks(allTaskIds);
+      }
+      // Clear Selection: Escape
+      if (e.key === 'Escape') {
+        setSelectedTasks([]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTasks, filteredAndSortedTasks]);
 
   const renderContent = () => {
     if (!isClient) {
@@ -268,6 +450,9 @@ export default function TasksPage() {
             allGroups={taskGroups} 
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
+            selectedTasks={selectedTasks}
+            onToggleSelection={handleToggleTaskSelection}
+            isDragDisabled={areFiltersActive}
           />
         </DragDropContext>
       )
@@ -278,20 +463,26 @@ export default function TasksPage() {
                     groupedTasks={groupedByDateTasks} 
                     onUpdateTask={handleUpdateTask} 
                     onDeleteTask={handleDeleteTask}
+                    selectedTasks={selectedTasks}
+                    onToggleSelection={handleToggleTaskSelection}
                 />
     }
 
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <TaskList 
-                tasks={filteredAndSortedTasks} 
-                groups={taskGroups} 
+                groupedTasks={groupedTasks}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onUpdateGroup={handleUpdateGroup}
                 onDeleteGroup={handleDeleteGroup}
-                selectedTasks={isBulkActionsUnlocked ? selectedTasks : []}
-                onToggleSelection={isBulkActionsUnlocked ? handleToggleTaskSelection : undefined}
+                isDragDisabled={true}
+                groupPagination={groupPagination}
+                onPageChange={handlePageChange}
+                selectedTasks={selectedTasks}
+                onToggleSelection={handleToggleTaskSelection}
+                onMoveTask={areFiltersActive ? undefined : handleMoveTask}
+                onMoveGroup={areFiltersActive ? undefined : handleMoveGroup}
             />
         </DragDropContext>
     );
@@ -302,7 +493,24 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div 
+        className="flex flex-col h-full relative select-none"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+    >
+      {selectionBox && selectionBox.isSelecting && (
+        <div
+            className="fixed z-50 bg-primary/20 border border-primary/30 rounded-md pointer-events-none"
+            style={{
+                left: Math.min(selectionBox.startX, selectionBox.currentX),
+                top: Math.min(selectionBox.startY, selectionBox.currentY),
+                width: Math.abs(selectionBox.currentX - selectionBox.startX),
+                height: Math.abs(selectionBox.currentY - selectionBox.startY)
+            }}
+        />
+      )}
       <div className="flex-shrink-0 p-4 flex items-center justify-center">
             <Card className="p-2 flex items-center gap-2 shadow-sm w-fit">
               <DropdownMenu>
@@ -324,6 +532,24 @@ export default function TasksPage() {
                       <KanbanSquare className="mr-2 h-4 w-4" />
                       <span>Kanban Board</span>
                     </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Settings</DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                      <DropdownMenuCheckboxItem 
+                          checked={appSettings.tasks.hideCompletedTasks}
+                          onCheckedChange={(checked) => {
+                              setAppSettings(prev => ({
+                                  ...prev,
+                                  tasks: {
+                                      ...prev.tasks,
+                                      hideCompletedTasks: checked
+                                  }
+                              }));
+                          }}
+                      >
+                          Hide Completed Tasks
+                      </DropdownMenuCheckboxItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>Filter</DropdownMenuLabel>
@@ -349,6 +575,9 @@ export default function TasksPage() {
                   New Group
                 </Button>
               )}
+              
+
+
               <Button onClick={() => setIsAddTaskOpen(true)}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 New Task
@@ -356,35 +585,75 @@ export default function TasksPage() {
             </Card>
       </div>
       
-      {isBulkActionsUnlocked && selectedTasks.length > 0 && (
-        <div className="px-4 sm:px-6 lg:px-8">
-            <AlertDialog open={isBulkDeleteConfirmOpen} onOpenChange={setIsBulkDeleteConfirmOpen}>
-                <div className="flex items-center justify-between p-3 bg-secondary rounded-lg border">
-                    <span className="text-sm font-medium">{selectedTasks.length} tasks selected</span>
-                      <Button variant="destructive" size="sm" onClick={() => setIsBulkDeleteConfirmOpen(true)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Selected
-                    </Button>
-                </div>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete the {selectedTasks.length} selected tasks. This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleBulkDelete}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
-      )}
-
       <div className="overflow-y-auto">
+        {areFiltersActive && (
+          <div className="bg-amber-500/10 text-amber-500 text-sm px-4 py-2 rounded-md border border-amber-500/20 m-4 mb-0 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span>Reordering is disabled while filters or custom sorting are active. Clear filters to reorder tasks.</span>
+          </div>
+        )}
         {renderContent()}
       </div>
+
+      {selectedTasks.length > 1 && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-foreground/5 backdrop-blur-md border border-border/50 rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-4">
+            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+              {selectedTasks.length} selected
+            </span>
+            <div className="h-4 w-px bg-border/50" />
+            
+            {isBulkActionsUnlocked && (
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 px-3 rounded-full text-xs"
+                    onClick={() => setIsBulkEditOpen(true)}
+                >
+                    <Sliders className="h-3 w-3 mr-1.5" />
+                    Edit
+                </Button>
+            )}
+
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              className="h-7 px-3 rounded-full shadow-sm hover:shadow-md transition-all text-xs"
+              onClick={() => setIsBulkDeleteConfirmOpen(true)}
+            >
+              <Trash2 className="h-3 w-3 mr-1.5" />
+              Delete
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-full ml-1 hover:bg-background/50"
+              onClick={() => setSelectedTasks([])}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+      )}
+
+      <AlertDialog open={isBulkDeleteConfirmOpen} onOpenChange={(open) => {
+        setIsBulkDeleteConfirmOpen(open);
+        if (!open) setItemToDelete(null);
+      }}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {itemToDelete 
+                        ? "This will permanently delete this task. This action cannot be undone."
+                        : `This will permanently delete the ${selectedTasks.length} selected ${selectedTasks.length === 1 ? 'task' : 'tasks'}. This action cannot be undone.`
+                    }
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AddTaskDialog 
         isOpen={isAddTaskOpen}
@@ -396,6 +665,13 @@ export default function TasksPage() {
         isOpen={isAddGroupOpen}
         onOpenChange={setIsAddGroupOpen}
         onAddGroup={handleAddGroup}
+      />
+      <BulkEditDialog
+        isOpen={isBulkEditOpen}
+        onOpenChange={setIsBulkEditOpen}
+        onBulkUpdate={handleBulkUpdate}
+        selectedCount={selectedTasks.length}
+        groups={taskGroups}
       />
     </div>
   );

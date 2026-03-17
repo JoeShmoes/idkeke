@@ -18,6 +18,7 @@ interface CellStyle {
 interface CellData {
     value: string;
     style?: CellStyle;
+    image?: string;
 }
 
 interface SheetsWorkspaceProps {
@@ -37,7 +38,13 @@ export default function SheetsWorkspace({ sheet, onUpdate }: SheetsWorkspaceProp
           Array.from({ length: COLS }, (_, c) => {
               const cell = content[r]?.[c];
               if (typeof cell === 'string') return { value: cell, style: {} };
-              if (typeof cell === 'object' && cell !== null) return { value: cell.value || '', style: cell.style || {} };
+              if (typeof cell === 'object' && cell !== null) {
+                  return {
+                      value: cell.value || '',
+                      style: cell.style || {},
+                      image: cell.image || undefined
+                  };
+              }
               return { value: '', style: {} };
           })
       );
@@ -142,6 +149,28 @@ export default function SheetsWorkspace({ sheet, onUpdate }: SheetsWorkspaceProp
 
       if (!selection) return;
 
+      const imageFiles = Array.from(e.clipboardData?.files || []).filter(f => f.type.startsWith('image/'));
+      if (imageFiles.length > 0) {
+          e.preventDefault();
+          const file = imageFiles[0];
+          const reader = new FileReader();
+          reader.onload = ev => {
+              const dataUrl = ev.target?.result as string;
+              const newData = [...data];
+              const startR = Math.min(selection.start.r, selection.end.r);
+              const startC = Math.min(selection.start.c, selection.end.c);
+              newData[startR] = [...newData[startR]];
+              newData[startR][startC] = {
+                  ...newData[startR][startC],
+                  value: '',
+                  image: dataUrl
+              };
+              updateSheet(newData);
+          };
+          reader.readAsDataURL(file);
+          return;
+      }
+
       e.preventDefault();
       const text = e.clipboardData?.getData('text/plain');
       if (!text) return;
@@ -166,7 +195,8 @@ export default function SheetsWorkspace({ sheet, onUpdate }: SheetsWorkspaceProp
               
               newData[r][c] = {
                   ...newData[r][c],
-                  value: cellStr.trim()
+                  value: cellStr.trim(),
+                  image: undefined
               };
           });
       });
@@ -201,7 +231,8 @@ export default function SheetsWorkspace({ sheet, onUpdate }: SheetsWorkspaceProp
                   for (let c = range.minC; c <= range.maxC; c++) {
                       newData[r][c] = {
                           ...newData[r][c],
-                          value: ''
+                          value: '',
+                          image: undefined
                       };
                   }
               }
@@ -240,10 +271,14 @@ export default function SheetsWorkspace({ sheet, onUpdate }: SheetsWorkspaceProp
                 </Button>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground ml-auto">
-                <span className="font-bold text-green-600">Fx</span>
+                <span className="font-bold text-primary">Fx</span>
                 <span className="truncate max-w-[200px]">
                     {selection ? 
-                        (editingCell ? data[editingCell.r][editingCell.c].value : data[selection.start.r][selection.start.c].value) 
+                        (() => {
+                            const cell = editingCell ? data[editingCell.r][editingCell.c] : data[selection.start.r][selection.start.c];
+                            if (cell.image) return '[Image]';
+                            return cell.value;
+                        })()
                         : 'Select a cell'}
                 </span>
             </div>
@@ -287,7 +322,7 @@ export default function SheetsWorkspace({ sheet, onUpdate }: SheetsWorkspaceProp
                                     )}
                                     onMouseDown={() => handleMouseDown(r, c)}
                                     onMouseEnter={() => handleMouseEnter(r, c)}
-                                    onDoubleClick={() => setEditingCell({r, c})}
+                                    onDoubleClick={() => !cell.image && setEditingCell({r, c})}
                                 >
                                     {isEditing ? (
                                         <input
@@ -307,15 +342,25 @@ export default function SheetsWorkspace({ sheet, onUpdate }: SheetsWorkspaceProp
                                             }}
                                         />
                                     ) : (
-                                        <div className={cn(
-                                            "w-full h-full px-1 text-sm whitespace-nowrap overflow-hidden text-ellipsis leading-8",
-                                            style.bold && "font-bold",
-                                            style.italic && "italic",
-                                            style.underline && "underline",
-                                            style.align && `text-${style.align}`
-                                        )}>
-                                            {cell.value}
-                                        </div>
+                                        cell.image ? (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <img
+                                                    src={cell.image}
+                                                    alt=""
+                                                    className="max-w-full max-h-full object-contain pointer-events-none"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className={cn(
+                                                "w-full h-full px-1 text-sm whitespace-nowrap overflow-hidden text-ellipsis leading-8",
+                                                style.bold && "font-bold",
+                                                style.italic && "italic",
+                                                style.underline && "underline",
+                                                style.align && `text-${style.align}`
+                                            )}>
+                                                {cell.value}
+                                            </div>
+                                        )
                                     )}
                                 </div>
                             );

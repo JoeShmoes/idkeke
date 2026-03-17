@@ -11,6 +11,7 @@ import { useApp } from '@/components/layout/app-provider';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ClipboardCheck, Building } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const statusConfig: Record<string, string> = {
     'in-progress': 'bg-blue-500',
@@ -20,7 +21,9 @@ const statusConfig: Record<string, string> = {
 
 
 export default function WorkshopFabricationGaragePage() {
-    const { projects, assets } = useApp();
+    const { projects, assets, appSettings } = useApp();
+    
+    const privacyClass = appSettings.finance.privacyMode ? 'blur-md select-none' : '';
 
     const inventory = assets.filter(asset => asset.category === 'physical');
   
@@ -76,7 +79,7 @@ export default function WorkshopFabricationGaragePage() {
                         {inventory.length > 0 ? inventory.slice(0, 5).map(item => (
                             <TableRow key={item.id}>
                                 <TableCell className="font-medium">{item.name}</TableCell>
-                                <TableCell className="text-right">${item.value.toFixed(2)}</TableCell>
+                                <TableCell className={cn("text-right", privacyClass)}>${item.value.toFixed(2)}</TableCell>
                             </TableRow>
                         )) : (
                              <TableRow>

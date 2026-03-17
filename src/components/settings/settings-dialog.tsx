@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sun, Moon, User, Sliders, CheckSquare, CircleDollarSign, FileDown, Keyboard, Palette, Bot, Lock, EyeOff, Loader2, Sidebar as SidebarIcon, Compass, KanbanSquare, Save, Search as SearchIcon, Download, Laptop, AppWindow } from 'lucide-react';
+import { Sun, Moon, User, Sliders, CheckSquare, CircleDollarSign, FileDown, Keyboard, Palette, Bot, Lock, EyeOff, Loader2, Sidebar as SidebarIcon, Compass, KanbanSquare, Save, Search as SearchIcon, Download, Laptop, AppWindow, Trash2, TrendingUp, Briefcase, Users, Microscope, Notebook, FileSpreadsheet, Wrench, Building, Activity, GraduationCap, Network, Shield, Command } from 'lucide-react';
 import { useApp } from '../layout/app-provider';
 import ProfileSettings from './profile-settings';
 import type { Shortcut, Theme, SidebarSide, SidebarVariant, SidebarCollapsible, TaskView, AppSettings } from '@/lib/types';
@@ -40,17 +40,15 @@ const settingsNav = {
         { id: 'universal', label: 'Universal', icon: Sliders },
         { id: 'profile', label: 'Profile', icon: User },
         { id: 'theme', label: 'Theme', icon: Palette },
+        { id: 'tasks', label: 'Tasks', icon: CheckSquare },
         { id: 'sidebar', label: 'Sidebar', icon: SidebarIcon },
         { id: 'navigation', label: 'Navigation', icon: Compass },
         { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
         { id: 'command-palette', label: 'Command Palette', icon: SearchIcon },
     ],
-    "Room Specific": [
-        { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-        { id: 'finance', label: 'Finance', icon: CircleDollarSign },
-    ],
     "Advanced": [
          { id: 'data', label: 'Data & Export', icon: FileDown },
+         { id: 'ai-memory', label: 'AI Memory', icon: Bot },
          { id: 'download', label: 'Installers', icon: Download },
     ]
 }
@@ -66,6 +64,7 @@ const themeOptions: { value: Theme, label: string, icon: React.ElementType, requ
     { value: 'theme-dracula', label: 'Dracula', icon: Moon, requiredLevel: 12 },
     { value: 'theme-gruvbox', label: 'Gruvbox', icon: Bot, requiredLevel: 12 },
     { value: 'theme-nord', label: 'Nord', icon: Palette, requiredLevel: 12 },
+    { value: 'theme-god-mode', label: 'God Mode', icon: Shield, requiredLevel: 50 },
 ]
 
 
@@ -85,7 +84,6 @@ export default function SettingsDialog({ isOpen, onOpenChange }: SettingsDialogP
             case 'clients': isUnlocked = (clients || []).length >= ach.threshold; break;
             case 'projects': isUnlocked = (projects || []).filter(p => p.status === 'completed').length >= ach.threshold; break;
             case 'finance': isUnlocked = (accounts || []).reduce((sum, acc) => acc.type === 'credit' ? sum - acc.balance : sum + acc.balance, 0) >= ach.threshold; break;
-            case 'notes': isUnlocked = (notes || []).length >= ach.threshold; break;
             case 'assets': isUnlocked = (assets || []).reduce((sum, asset) => sum + asset.value, 0) >= ach.threshold; break;
             case 'learning': isUnlocked = (learningResources || []).filter(r => r.status === 'completed').length >= ach.threshold; break;
             case 'networking': isUnlocked = (networkContacts || []).length >= ach.threshold; break;
@@ -351,7 +349,7 @@ export default function SettingsDialog({ isOpen, onOpenChange }: SettingsDialogP
   
   const FinanceSettings = () => (
     <div className="space-y-8">
-        <Card title="Finance Settings">
+        <Card title="Budgeting Settings">
             <div className="space-y-4">
                 <div>
                     <Label className="text-base">Default Currency</Label>
@@ -398,9 +396,86 @@ export default function SettingsDialog({ isOpen, onOpenChange }: SettingsDialogP
                 <FileDown className="mr-2 h-4 w-4" />
                 Export to PDF
             </Button>
-         </div>
+        </div>
     </Card>
 );
+
+  const AIMemorySettings = () => {
+    const { aiMemories, setAiMemories } = useApp();
+    const hasMemories = Array.isArray(aiMemories) && aiMemories.length > 0;
+
+    const handleDelete = (id: string) => {
+      setAiMemories((prev) => (Array.isArray(prev) ? prev.filter((m) => m.id !== id) : []));
+    };
+
+    const handleClearAll = () => {
+      setAiMemories([]);
+    };
+
+    const sortedMemories = hasMemories
+      ? [...aiMemories].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      : [];
+
+    return (
+      <Card title="AI Memory">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Alfred AI stores small snippets from your chats so it can remember important details
+            over time. You can review or delete them here.
+          </p>
+          {!hasMemories && (
+            <div className="text-sm text-muted-foreground">
+              Alfred AI has not stored any memories yet.
+            </div>
+          )}
+          {hasMemories && (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {sortedMemories.length} memories stored. Oldest entries are removed first.
+                </span>
+                <Button variant="outline" size="sm" onClick={handleClearAll}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear all
+                </Button>
+              </div>
+              <div className="mt-2 border rounded-md max-h-80 overflow-y-auto divide-y">
+                {sortedMemories.map((memory) => (
+                  <div key={memory.id} className="p-3 flex items-start gap-3">
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            {memory.source === 'chat' ? 'Chat' : 'App'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(memory.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {memory.text}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="mt-1 h-7 w-7 shrink-0"
+                      onClick={() => handleDelete(memory.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </Card>
+    );
+  };
 
  const DownloadSettings = () => (
    <div className="space-y-8">
@@ -458,51 +533,44 @@ const ShortcutSettings = () => {
 
 
     useEffect(() => {
-        if (!editingShortcutKey) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!editingShortcutKey) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
 
-        const handleKeyDown = (event: KeyboardEvent) => {
-            event.preventDefault();
+            const key = e.key.toLowerCase();
             
-            // Ignore lonely modifier key presses
-            if (['Control', 'Meta', 'Shift', 'Alt'].includes(event.key)) return;
+            // Ignore if it's just a modifier key being pressed alone
+            if (['control', 'meta', 'alt', 'shift'].includes(key)) return;
 
-            const keys: string[] = [];
-            if (event.metaKey || event.ctrlKey) keys.push('mod');
-            if (event.shiftKey) keys.push('shift');
-            if (event.altKey) keys.push('alt');
+            // Enforce mod (Ctrl/Cmd) + Shift as the base to avoid browser conflicts
+            const newKeys = ['mod', 'shift', key];
             
-            const keyName = event.key.toLowerCase();
-            keys.push(keyName);
-            
-            if (keys.length > 1) { // Ensure a key other than a modifier was pressed
-                 setAppSettings(prev => ({
-                    ...prev,
-                    shortcuts: {
-                        ...prev.shortcuts,
-                        [editingShortcutKey]: {
-                            ...(prev.shortcuts[editingShortcutKey] as Shortcut || {}),
-                            keys: keys,
-                        },
+            setAppSettings(prev => ({
+                ...prev,
+                shortcuts: {
+                    ...prev.shortcuts,
+                    [editingShortcutKey]: {
+                        ...(prev.shortcuts[editingShortcutKey] as Shortcut || {}),
+                        keys: newKeys,
                     },
-                }));
-                setEditingShortcutKey(null);
-            }
+                },
+            }));
+
+            setEditingShortcutKey(null);
+            toast({
+                title: "Shortcut Updated",
+                description: `New shortcut: ${isMac ? '⌘' : 'Ctrl / Cmd'} + Shift + ${key.toUpperCase()}`,
+            });
         };
 
-        const handleKeyUp = () => {
-             if (editingShortcutKey) {
-                // If only a modifier was pressed and held, then released, cancel editing.
-                setTimeout(() => setEditingShortcutKey(null), 100);
-             }
+        if (editingShortcutKey) {
+            window.addEventListener('keydown', handleKeyDown, true);
         }
 
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
-        }
-    }, [editingShortcutKey, setAppSettings]);
+        return () => window.removeEventListener('keydown', handleKeyDown, true);
+    }, [editingShortcutKey, setAppSettings, isMac]);
 
 
     if (!shortcuts) {
@@ -518,7 +586,7 @@ const ShortcutSettings = () => {
     return (
         <Card title="Keyboard Shortcuts">
              <p className="text-sm text-muted-foreground mb-6">
-                 Click on a shortcut to change it. Your new shortcut will always start with {isMac ? '⌘' : 'Ctrl'}.
+                 Click on a shortcut to change it. Your new shortcut will always start with {isMac ? '⌘' : 'Ctrl / Cmd'} + Shift.
              </p>
              <div className="space-y-6">
                 {Object.entries(shortcutGroups).map(([groupName, groupShortcuts]: [string, {key: any, name: any}[]]) => (
@@ -530,12 +598,35 @@ const ShortcutSettings = () => {
                                     <span className="text-sm font-medium flex-1">{name}</span>
                                     <Button 
                                         variant="outline"
-                                        className="w-48 font-mono text-xs justify-center"
+                                        className="w-56 font-mono text-xs justify-center gap-1.5"
                                         onClick={() => setEditingShortcutKey(key)}
                                     >
                                         {editingShortcutKey === key 
                                             ? "Press any key..." 
-                                            : (shortcuts[key as keyof typeof shortcuts]?.keys || []).map((k: any) => k === 'mod' ? (isMac ? '⌘' : 'Ctrl') : k.toUpperCase()).join(' + ') || 'Not set'}
+                                            : (
+                                                <div className="flex items-center gap-1">
+                                                    {(shortcuts[key as keyof typeof shortcuts]?.keys || []).map((k: any, i: number) => (
+                                                        <span key={i} className="flex items-center gap-1">
+                                                            {k === 'mod' ? (
+                                                                <div className="flex items-center gap-1">
+                                                                    {isMac ? <Command className="h-3 w-3" /> : <span className="px-1 border rounded bg-muted text-[10px]">Ctrl</span>}
+                                                                    <span>/</span>
+                                                                    <span className="px-1 border rounded bg-muted text-[10px]">Cmd</span>
+                                                                </div>
+                                                            ) : k === 'alt' ? (
+                                                                <span className="px-1 border rounded bg-muted">Alt</span>
+                                                            ) : k === 'shift' ? (
+                                                                <span className="px-1 border rounded bg-muted">Shift</span>
+                                                            ) : (
+                                                                <span className="px-1 border rounded bg-muted min-w-[1.5rem] text-center uppercase">{k}</span>
+                                                            )}
+                                                            {i < (shortcuts[key as keyof typeof shortcuts]?.keys.length - 1) && <span>+</span>}
+                                                        </span>
+                                                    ))}
+                                                    {(!shortcuts[key as keyof typeof shortcuts]?.keys || shortcuts[key as keyof typeof shortcuts]?.keys.length === 0) && 'Not set'}
+                                                </div>
+                                            )
+                                        }
                                     </Button>
                                 </div>
                             ))}
@@ -547,16 +638,59 @@ const ShortcutSettings = () => {
     )
   }
 
-  const CommandPaletteSettings = () => (
-    <Card title="Command Palette">
-        <p className="text-sm text-muted-foreground">
-            The command palette allows you to quickly navigate and perform actions. You can customize which items appear in the search results here.
-        </p>
-        <p className="text-sm text-muted-foreground mt-4">
-            (Settings for the command palette are coming soon.)
-        </p>
-    </Card>
-);
+  const CommandPaletteSettings = () => {
+    const { appSettings, setAppSettings } = useApp();
+
+    const handleUpdate = (key: keyof AppSettings['commandPalette'], value: boolean) => {
+        setAppSettings(prev => ({
+            ...prev,
+            commandPalette: {
+                ...prev.commandPalette,
+                [key]: value
+            }
+        }));
+    }
+
+    return (
+        <Card title="Command Palette">
+            <p className="text-sm text-muted-foreground mb-4">
+                The command palette allows you to quickly navigate and perform actions. Customize what appears in search results.
+            </p>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                        <Label>Include Tasks</Label>
+                        <p className="text-sm text-muted-foreground">Search through your tasks</p>
+                    </div>
+                    <Switch 
+                        checked={appSettings.commandPalette?.includeTasks ?? true}
+                        onCheckedChange={(c) => handleUpdate('includeTasks', c)}
+                    />
+                </div>
+                <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                        <Label>Include Contacts</Label>
+                        <p className="text-sm text-muted-foreground">Search through your network contacts</p>
+                    </div>
+                    <Switch 
+                        checked={appSettings.commandPalette?.includeContacts ?? true}
+                        onCheckedChange={(c) => handleUpdate('includeContacts', c)}
+                    />
+                </div>
+                <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                        <Label>Include Projects</Label>
+                        <p className="text-sm text-muted-foreground">Search through your projects</p>
+                    </div>
+                    <Switch 
+                        checked={appSettings.commandPalette?.includeProjects ?? true}
+                        onCheckedChange={(c) => handleUpdate('includeProjects', c)}
+                    />
+                </div>
+            </div>
+        </Card>
+    );
+  };
 
   const renderContent = () => {
     if (!appSettings) {
@@ -571,11 +705,21 @@ const ShortcutSettings = () => {
         case 'shortcuts': return <ShortcutSettings />;
         case 'command-palette': return <CommandPaletteSettings />;
         case 'tasks': return <TaskSettings />;
+        case 'budgeting': return <FinanceSettings />;
         case 'finance': return <FinanceSettings />;
         case 'data': return <DataSettings />;
+        case 'ai-memory': return <AIMemorySettings />;
         case 'download': return <DownloadSettings />;
-        default:
-            return <div className="text-center text-muted-foreground p-8">Settings for {settingsNav.Global.find(i=>i.id===activeTab)?.label || settingsNav["Room Specific"].find(i=>i.id===activeTab)?.label} are not yet available.</div>;
+        default: {
+            const findLabel = () => {
+                for (const group of Object.values(settingsNav)) {
+                    const item = group.find(i => i.id === activeTab);
+                    if (item) return item.label;
+                }
+                return activeTab;
+            };
+            return <div className="text-center text-muted-foreground p-8">Settings for {findLabel()} are not yet available.</div>;
+        }
     }
   }
 

@@ -2,10 +2,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { cn, copyToClipboard } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '../ui/skeleton';
 import type { ResearchSession } from '@/lib/types';
-import { ExternalLink, Search, Notebook, Image as ImageIcon } from 'lucide-react';
+import { ExternalLink, Search, Notebook, Image as ImageIcon, Copy, Trash2 } from 'lucide-react';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -33,6 +35,40 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
         const handleMessage = (event: MessageEvent) => {
             if (event.data && event.data.type === 'resize' && typeof event.data.height === 'number') {
                 setIframeHeight(event.data.height + 40); // Add some padding
+            }
+            if (event.data && event.data.type === 'navigate' && typeof event.data.href === 'string') {
+                const href: string = event.data.href;
+                // internal wikipedia-style links should be re-fetched via our proxy so we keep the same styling and scripting
+                if (href.includes('/api/rest_v1/page/html/')) {
+                    const segments = href.split('/');
+                    const maybeTitle = segments[segments.length - 1] || '';
+                    const title = decodeURIComponent(maybeTitle);
+                    setLoadingContent(true);
+                    setError(null);
+                    const fetchPromise = (typeof window !== 'undefined' && (window as any).electron)
+                        ? (window as any).electron.ipcRenderer.invoke('fetch-wiki', title)
+                        : fetch(`/api/wiki?title=${encodeURIComponent(title)}`).then(res => {
+                              if (!res.ok) throw new Error('Failed to load Wikipedia content');
+                              return res.json();
+                          });
+                    fetchPromise
+                      .then((data: any) => {
+                          if (data.error) throw new Error(data.error);
+                          if (data.html) {
+                              setHtmlContent(data.html);
+                          } else {
+                              throw new Error('No HTML content returned');
+                          }
+                      })
+                      .catch((err: any) => {
+                          console.error('Wiki fetch error', err);
+                          setHtmlContent(`<div class="p-4 text-center text-muted-foreground"><p>Could not load full article preview.</p><p class="mt-2 text-sm">${err.message || 'Unknown error'}</p></div>`);
+                      })
+                      .finally(() => setLoadingContent(false));
+                } else {
+                    // non-wiki links open externally
+                    window.open(href, '_blank');
+                }
             }
         };
         window.addEventListener('message', handleMessage);
@@ -155,11 +191,13 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
             <ResizablePanel defaultSize={60}>
                 <ScrollArea className="h-full">
                      <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-                        <article 
-                            ref={articleRef}
-                            onClick={handleArticleClick}
-                            className="prose prose-sm dark:prose-invert max-w-none [&_img]:cursor-pointer [&_img]:rounded-md [&_img]:border"
-                        >
+                        <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <article 
+                      ref={articleRef}
+                      onClick={handleArticleClick}
+                      className="prose prose-sm dark:prose-invert max-w-none [&_img]:cursor-pointer [&_img]:rounded-md [&_img]:border select-text"
+                    >
                             <h2 className="text-xl font-semibold border-b pb-2 mb-4">{session.articleTitle}</h2>
                             {loadingContent ? (
                                 <div className="space-y-3">
@@ -176,8 +214,7 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
                                         <!DOCTYPE html>
                                         <html>
                                         <head>
-                                            <base target="_blank">
-                                            <meta name="color-scheme" content="light dark">
+                                                    <meta name="color-scheme" content="light dark">
                                             <style>
                                                 :root {
                                                     color-scheme: light dark;
@@ -191,8 +228,15 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
                                                 }
                                                 
                                                 /* Dynamic text color based on theme */
-                                                body, p, h1, h2, h3, h4, h5, h6, li, span, div, td, th {
+                                                body, p, h1, h2, h3, h4, h5, h6, li, span, div {
                                                     color: light-dark(#000000, #ffffff);
+                                                }
+
+                                                /* Fix for white text on white background in tables */
+                                                table, th, td, .infobox, .wikitable {
+                                                    background-color: light-dark(#ffffff, #1f1f1f) !important;
+                                                    color: light-dark(#000000, #ffffff) !important;
+                                                    border-color: light-dark(#ddd, #333) !important;
                                                 }
 
                                                 /* Ensure links are distinct */
@@ -207,6 +251,19 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
                                                 .infobox { 
                                                     float: right; 
                                                     margin: 0 0 1rem 1rem; 
+                                                }
+                                            </style>
+                                            <script>
+                                                // any clicks inside the injected document get forwarded to the React component via postMessage.
+                                                // the parent can then decide how to handle navigation (e.g. reload wiki content).
+                                                document.addEventListener('click', function(e) {
+                                                    const anchor = e.target.closest && e.target.closest('a');
+                                                    if (anchor && anchor.href) {
+                                                        e.preventDefault();
+                                                        window.parent.postMessage({ type: 'navigate', href: anchor.href }, '*');
+                                                    }
+                                                });
+                                            </script>
                                                     border: 1px solid #ddd; 
                                                     background: #f9f9f9; 
                                                     padding: 10px; 
@@ -242,6 +299,22 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
                                  />
                             )}
                         </article>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-56">
+                    <ContextMenuItem onClick={() => {
+                      copyToClipboard(session.articleTitle || '');
+                    }}>
+                      <Copy className="mr-2 h-4 w-4" /> Copy Title
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => {
+                      if (session.summary) {
+                        copyToClipboard(session.summary);
+                      }
+                    }}>
+                      <Copy className="mr-2 h-4 w-4" /> Copy Summary
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
                     </div>
                 </ScrollArea>
             </ResizablePanel>
@@ -253,13 +326,25 @@ export default function ResearchWorkspace({ session, isLoading, onNotesUpdate }:
                         <h2 className="text-lg font-semibold">My Notes</h2>
                     </div>
                     <div className="flex-1 p-0 relative">
-                        <Textarea 
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Start typing your notes here..."
-                            className="absolute inset-0 w-full h-full p-6 border-none resize-none shadow-none focus-visible:ring-0 !ring-offset-0 text-base bg-transparent leading-relaxed rounded-none"
-                        />
-                    </div>
+                <ContextMenu>
+                  <ContextMenuTrigger className="h-full w-full block">
+                    <Textarea 
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Start typing your notes here..."
+                      className="absolute inset-0 w-full h-full p-6 border-none resize-none shadow-none focus-visible:ring-0 !ring-offset-0 text-base bg-transparent leading-relaxed rounded-none"
+                    />
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto">
+                    <ContextMenuItem onClick={() => copyToClipboard(notes)}>
+                      <Copy className="mr-2 h-4 w-4" /> Copy Notes
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => setNotes('')} className="text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" /> Clear Notes
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              </div>
                 </div>
             </ResizablePanel>
         </ResizablePanelGroup>

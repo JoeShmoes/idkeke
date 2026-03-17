@@ -11,6 +11,7 @@ import { HoverProvider } from './hover-context';
 import { Loader2 } from 'lucide-react';
 import { CommandPaletteProvider } from './search-palette';
 import { useSound } from '@/hooks/use-sound';
+import CalendarNotifications from '@/components/calendar/CalendarNotifications';
 
 import WindowControls from '../ui/window-controls';
 
@@ -73,6 +74,7 @@ export default function AppBody({ children }: { children: React.ReactNode }) {
                         <div className={cn(!loading ? 'opacity-100 transition-opacity duration-500' : 'opacity-0', 'h-full w-full')}>
                         {children}
                         </div>
+                        <CalendarNotifications />
                     </GlobalContextMenu>
                     </SidebarProvider>
                 </HoverProvider>

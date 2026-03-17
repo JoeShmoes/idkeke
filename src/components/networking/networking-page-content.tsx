@@ -11,12 +11,14 @@ import KpiCard from '@/components/dashboard/kpi-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useApp } from '@/components/layout/app-provider';
+import { useHover } from '@/components/layout/hover-context';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import AddContactDialog from '@/components/networking/add-contact-dialog';
 
 export default function NetworkingPageContent() {
   const { networkContacts, setNetworkContacts } = useApp();
+  const { setHoveredItem } = useHover();
   const [isClient, setIsClient] = useState(false);
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [contactToEdit, setContactToEdit] = useState<NetworkContact | undefined>(undefined);
@@ -88,11 +90,33 @@ export default function NetworkingPageContent() {
           
           <div className="space-y-4">
             {networkContacts.length > 0 ? networkContacts.map(contact => (
-                <Card key={contact.id} className="bg-card/50">
+                <Card 
+                    key={contact.id} 
+                    className="bg-card/50"
+                    onMouseEnter={() => setHoveredItem({ 
+                        type: 'contact', 
+                        data: { 
+                            ...contact, 
+                            onEdit: () => handleOpenEditDialog(contact),
+                            onDelete: () => handleDeleteContact(contact.id)
+                        } 
+                    })}
+                    onMouseLeave={() => setHoveredItem(null)}
+                >
                     <CardContent className="p-4 flex items-start gap-4">
-                        <Avatar>
-                            <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
-                        </Avatar>
+                        {contact.icon ? (
+                            <div className="text-2xl flex-shrink-0 flex items-center justify-center h-10 w-10 bg-muted/30 rounded-full select-none overflow-hidden">
+                                {(contact.icon.startsWith('data:image') || contact.icon.startsWith('http')) ? (
+                                    <img src={contact.icon} alt="Icon" className="h-full w-full object-cover" />
+                                ) : (
+                                    contact.icon
+                                )}
+                            </div>
+                        ) : (
+                            <Avatar>
+                                <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
+                            </Avatar>
+                        )}
                         <div className="flex-1">
                             <p className="font-semibold">{contact.name}</p>
                             <p className="text-sm text-muted-foreground">{contact.role} at {contact.company}</p>

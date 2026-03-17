@@ -3,9 +3,16 @@
 import { useCallback } from 'react';
 
 export const useSound = () => {
-  const playSound = useCallback((soundName: 'good' | 'overdue' | 'welcome') => {
+  const playSound = useCallback((soundName: 'good' | 'overdue' | 'welcome' | 'reminder') => {
     try {
-      const audio = new Audio(`/sounds/${soundName}.mp3`);
+      const fileNameMap = {
+        good: 'Good.mp3',
+        overdue: 'Overdue.mp3',
+        welcome: 'Welcome.mp3',
+        reminder: 'Reminder.mp3'
+      };
+      
+      const audio = new Audio(`/sounds/${fileNameMap[soundName]}`);
       audio.volume = 0.3; // Set volume to 30%
       audio.play().catch(() => {
         // Silently fail if audio can't play (user interaction required, etc.)
@@ -13,7 +20,7 @@ export const useSound = () => {
       setTimeout(() => {
         audio.pause();
         audio.currentTime = 0;
-      }, 2000);
+      }, 5000); // Increased timeout to allow longer sounds to play
     } catch (error) {
       // Silently fail
     }

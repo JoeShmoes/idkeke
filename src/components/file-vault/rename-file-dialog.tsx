@@ -15,6 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { VaultFile, VaultFolder } from '@/lib/types';
 
+import { Pencil } from 'lucide-react';
+
 interface RenameFileDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -42,15 +44,20 @@ export default function RenameFileDialog({ isOpen, onOpenChange, onSave, file }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50 shadow-2xl">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Rename {itemType}</DialogTitle>
+             <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg bg-primary/10">
+                    <Pencil className="h-5 w-5 text-primary" />
+                </div>
+                <DialogTitle>Rename {itemType}</DialogTitle>
+            </div>
             <DialogDescription>
               Enter a new name for "{file?.name}".
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-6">
             <div className="space-y-2">
               <Label htmlFor="name">New Name</Label>
               <Input 
@@ -59,12 +66,13 @@ export default function RenameFileDialog({ isOpen, onOpenChange, onSave, file }:
                 onChange={(e) => setName(e.target.value)}
                 required
                 autoFocus
+                className="bg-secondary/50 border-border/50 focus:bg-background transition-all"
               />
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" className="shadow-lg shadow-primary/20">Save Changes</Button>
           </DialogFooter>
         </form>
       </DialogContent>

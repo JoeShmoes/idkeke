@@ -10,9 +10,11 @@ interface TaskListGroupByDateProps {
     groupedTasks: { title: string; tasks: Task[]; color: string }[];
     onUpdateTask: (task: Task) => void;
     onDeleteTask: (taskId: string) => void;
+    selectedTasks?: string[];
+    onToggleSelection?: (taskId: string, e?: React.MouseEvent) => void;
 }
 
-export default function TaskListGroupByDate({ groupedTasks, onUpdateTask, onDeleteTask }: TaskListGroupByDateProps) {
+export default function TaskListGroupByDate({ groupedTasks, onUpdateTask, onDeleteTask, selectedTasks, onToggleSelection }: TaskListGroupByDateProps) {
     return (
         <div className="w-full lg:w-[80%] mx-auto">
              <Accordion type="multiple" defaultValue={groupedTasks.map(g => g.title)} className="w-full space-y-4">
@@ -32,6 +34,8 @@ export default function TaskListGroupByDate({ groupedTasks, onUpdateTask, onDele
                                             onUpdate={onUpdateTask}
                                             onDelete={onDeleteTask}
                                             isGroupedByDate={true}
+                                            isSelected={selectedTasks?.includes(task.id)}
+                                            onToggleSelection={onToggleSelection}
                                         />
                                     ))
                                 ) : (

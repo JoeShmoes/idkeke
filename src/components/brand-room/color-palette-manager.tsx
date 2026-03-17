@@ -10,6 +10,12 @@ import { Button } from '../ui/button';
 import { Copy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 interface ColorPaletteManagerProps {
   profile: BrandProfile;
@@ -34,7 +40,7 @@ export default function ColorPaletteManager({ profile, onUpdate }: ColorPaletteM
   
   const handleCopy = (e: React.MouseEvent, colorValue: string) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(colorValue);
+    copyToClipboard(colorValue);
     setCopiedColor(colorValue);
     toast({
         title: "Copied!",
@@ -47,23 +53,33 @@ export default function ColorPaletteManager({ profile, onUpdate }: ColorPaletteM
     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
       {Object.entries(colors).map(([name, value]) => (
         <div key={name} className="space-y-2">
-            <div className="relative group w-full aspect-square rounded-lg border-2 overflow-hidden cursor-pointer">
-                <div className="absolute inset-0 w-full h-full" style={{ backgroundColor: value }} />
-                <Input 
-                    type="color" 
-                    value={value} 
-                    onChange={(e) => handleColorChange(name as keyof typeof colors, e.target.value)}
-                    className="absolute inset-0 w-full h-full p-0 border-0 opacity-0 cursor-pointer"
-                />
-                <Button 
-                    size="icon"
-                    variant="secondary"
-                    className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => handleCopy(e, value)}
-                >
-                    {copiedColor === value ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
-            </div>
+            <ContextMenu>
+                <ContextMenuTrigger asChild>
+                    <div className="relative group w-full aspect-square rounded-lg border-2 overflow-hidden cursor-pointer">
+                        <div className="absolute inset-0 w-full h-full" style={{ backgroundColor: value }} />
+                        <Input 
+                            type="color" 
+                            value={value} 
+                            onChange={(e) => handleColorChange(name as keyof typeof colors, e.target.value)}
+                            className="absolute inset-0 w-full h-full p-0 border-0 opacity-0 cursor-pointer"
+                        />
+                        <Button 
+                            size="icon"
+                            variant="secondary"
+                            className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => handleCopy(e, value)}
+                        >
+                            {copiedColor === value ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                    </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto">
+                    <ContextMenuItem onClick={(e) => handleCopy(e, value)}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy Hex Code
+                    </ContextMenuItem>
+                </ContextMenuContent>
+            </ContextMenu>
             <Label htmlFor={name} className="capitalize font-semibold">{name}</Label>
             <Input
               id={name}

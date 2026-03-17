@@ -26,6 +26,20 @@ import {
     Presentation,
     Package,
     FileText,
+    Microscope,
+    FileSpreadsheet,
+    Wrench,
+    Wallet,
+    Lock,
+    Activity,
+    GraduationCap,
+    Rocket,
+    Archive,
+    PieChart,
+    LayoutDashboard,
+    Zap,
+    ListTodo,
+    Calendar
   } from 'lucide-react';
   
   export const iconMap = {
@@ -56,7 +70,20 @@ import {
     Presentation,
     Package,
     FileText,
+    Microscope,
+    FileSpreadsheet,
+    Wrench,
+    Wallet,
+    Lock,
+    Activity,
+    GraduationCap,
+    Rocket,
+    Archive,
+    PieChart,
+    LayoutDashboard,
+    Zap,
+    ListTodo,
+    Calendar
   };
   
   export type IconName = keyof typeof iconMap;
-  

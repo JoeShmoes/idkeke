@@ -44,7 +44,7 @@ export default function InitialBalanceDialog({ isOpen, onOpenChange, onSave }: I
           <DialogContent className="sm:max-w-md">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
-                <DialogTitle>Welcome to the Finance Hub!</DialogTitle>
+                <DialogTitle>Welcome to the Budgeting Hub!</DialogTitle>
                 <DialogDescription>
                   Let's get started by setting up your first account.
                 </DialogDescription>

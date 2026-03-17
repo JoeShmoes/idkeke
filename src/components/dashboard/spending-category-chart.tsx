@@ -16,13 +16,14 @@ const COLORS = [
     'hsl(197, 37%, 34%)',
 ];
 
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = ({ active, payload, privacyMode }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+      const privacyClass = privacyMode ? 'blur-md select-none' : '';
       return (
         <div className="rounded-lg border bg-background p-2 shadow-sm">
-            <p className="font-medium">{data.name}: {formatCurrency(data.value)}</p>
+            <p className={cn("font-medium", privacyClass)}>{data.name}: {formatCurrency(data.value)}</p>
         </div>
       );
     }
@@ -31,7 +32,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 
 export default function SpendingCategoryChart({className}: {className?: string}) {
-    const { transactions } = useApp();
+    const { transactions, appSettings } = useApp();
     const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
     const onPieEnter = useCallback((_: any, index: number) => {
@@ -69,7 +70,7 @@ export default function SpendingCategoryChart({className}: {className?: string})
         <div className={cn("h-80", className)}>
             <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                     <Tooltip content={<CustomTooltip />} />
+                     <Tooltip content={<CustomTooltip privacyMode={appSettings.finance.privacyMode} />} />
                     <Pie
                         data={data}
                         cx="50%"

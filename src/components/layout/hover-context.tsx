@@ -3,7 +3,7 @@
 
 import { createContext, useState, useContext, ReactNode } from 'react';
 
-export type HoveredItemType = 'task' | 'note' | 'default' | 'project' | 'fileOrFolder' | 'goal' | 'client' | 'asset' | 'learning' | 'contact';
+export type HoveredItemType = 'task' | 'note' | 'default' | 'project' | 'fileOrFolder' | 'goal' | 'client' | 'asset' | 'learning' | 'contact' | 'account' | 'transaction';
 
 interface HoveredItem {
     type: HoveredItemType;

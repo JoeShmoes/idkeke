@@ -3,12 +3,13 @@
 
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout/app-provider';
+import { cn } from '@/lib/utils';
 import type { NavGroup, NavItem } from '@/lib/types';
 import { DragDropContext, Droppable, Draggable, type DropResult } from 'react-beautiful-dnd';
 import { Card } from './settings-dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { GripVertical, Trash2, Pencil, PlusCircle, Save, RotateCcw, Package } from 'lucide-react';
+import { GripVertical, Trash2, Pencil, PlusCircle, Save, RotateCcw, Package, ArrowUp, ArrowDown, Check, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import {
   AlertDialog,
@@ -31,7 +32,7 @@ import {
   } from '@/components/ui/dialog';
 import { allNavItems } from '@/lib/nav-items';
 import { useToast } from '@/hooks/use-toast';
-import { iconMap, type IconName } from '@/lib/icons';
+import { iconMap, type IconName } from '@/lib/nav-items';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
@@ -50,6 +51,35 @@ export default function SidebarNavSettings() {
     const [editingSectionName, setEditingSectionName] = useState('');
     const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
     const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
+    const [reorderingSectionIds, setReorderingSectionIds] = useState<Set<string>>(new Set());
+
+    const toggleSectionReordering = (e: React.MouseEvent, sectionLabel: string) => {
+        e.stopPropagation();
+        const newSet = new Set(reorderingSectionIds);
+        if (newSet.has(sectionLabel)) {
+            newSet.delete(sectionLabel);
+        } else {
+            newSet.add(sectionLabel);
+        }
+        setReorderingSectionIds(newSet);
+    };
+
+    const handleMoveItem = (sectionLabel: string, itemHref: string, direction: 'up' | 'down') => {
+        const newStructure = [...navStructure];
+        const sectionIndex = newStructure.findIndex(s => s.label === sectionLabel);
+        if (sectionIndex === -1) return;
+
+        const items = [...newStructure[sectionIndex].items];
+        const itemIndex = items.findIndex(i => i.href === itemHref);
+        if (itemIndex === -1) return;
+
+        const swapIndex = direction === 'up' ? itemIndex - 1 : itemIndex + 1;
+        if (swapIndex < 0 || swapIndex >= items.length) return;
+
+        [items[itemIndex], items[swapIndex]] = [items[swapIndex], items[itemIndex]];
+        newStructure[sectionIndex].items = items;
+        setNavStructure(newStructure);
+    };
 
     // New state for the add room dialog
     const [newRoomLabel, setNewRoomLabel] = useState('');
@@ -283,19 +313,31 @@ export default function SidebarNavSettings() {
                                 ) : (
                                     <h3 className="text-lg font-semibold">{section.label}</h3>
                                 )}
-                                {section.label !== "Main" && editingSectionId !== section.label && (
-                                     <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingSectionId(section.label); setEditingSectionName(section.label); }}>
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setSectionToDelete(section.label)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant={reorderingSectionIds.has(section.label) ? "secondary" : "ghost"}
+                                        size="sm"
+                                        className={cn("h-7 gap-1.5 mr-2", reorderingSectionIds.has(section.label) && "bg-secondary text-secondary-foreground")}
+                                        onClick={(e) => toggleSectionReordering(e, section.label)}
+                                        title="Toggle Reorder"
+                                    >
+                                        {reorderingSectionIds.has(section.label) ? <Check className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
+                                        <span className="text-xs">{reorderingSectionIds.has(section.label) ? "Done" : "Reorder"}</span>
+                                    </Button>
+                                    {section.label !== "Main" && editingSectionId !== section.label && (
+                                        <>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingSectionId(section.label); setEditingSectionName(section.label); }}>
+                                                <Pencil className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setSectionToDelete(section.label)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
 
-                            <Droppable droppableId={section.label} type="ITEM" isDropDisabled={false}>
+                            <Droppable droppableId={section.label} type="ITEM" isDropDisabled={reorderingSectionIds.has(section.label)}>
                                 {(provided, snapshot) => (
                                     <div
                                         {...provided.droppableProps}
@@ -303,27 +345,53 @@ export default function SidebarNavSettings() {
                                         className="space-y-2 min-h-[50px] bg-background/50 rounded-md p-2"
                                     >
                                         {section.items.map((item, itemIndex) => (
-                                            <Draggable key={item.href} draggableId={item.href} index={itemIndex}>
-                                                {(provided) => (
-                                                    <div
-                                                        ref={provided.innerRef}
-                                                        {...provided.draggableProps}
-                                                        {...provided.dragHandleProps}
-                                                        className="p-2 border rounded-md bg-background flex items-center gap-2 group"
-                                                    >
-                                                        <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                                        <IconComponent name={item.icon as string} />
-                                                        <span className="text-sm flex-1">{item.label}</span>
-                                                        {isRoomCustom(item) && (
-                                                            <>
-                                                                <Badge variant="outline">Custom</Badge>
-                                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={() => handleDeleteRoom(section.label, item.href)}>
-                                                                    <Trash2 className="h-4 w-4"/>
-                                                                </Button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                )}
+                                            <Draggable key={item.href} draggableId={item.href} index={itemIndex} isDragDisabled={reorderingSectionIds.has(section.label)}>
+                                                {(provided) => {
+                                                    const isReordering = reorderingSectionIds.has(section.label);
+                                                    return (
+                                                        <div
+                                                            ref={provided.innerRef}
+                                                            {...provided.draggableProps}
+                                                            {...provided.dragHandleProps}
+                                                            className={cn(
+                                                                "p-2 border rounded-md bg-background flex items-center gap-2 group transition-all",
+                                                                isReordering && "border-dashed border-primary/50"
+                                                            )}
+                                                        >
+                                                            {!isReordering && <GripVertical className="h-5 w-5 text-muted-foreground" />}
+                                                            {isReordering && (
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <Button
+                                                                        size="icon"
+                                                                        variant="ghost"
+                                                                        className="h-4 w-4 text-muted-foreground hover:text-foreground"
+                                                                        onClick={() => handleMoveItem(section.label, item.href, 'up')}
+                                                                    >
+                                                                        <ArrowUp className="h-3 w-3" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="icon"
+                                                                        variant="ghost"
+                                                                        className="h-4 w-4 text-muted-foreground hover:text-foreground"
+                                                                        onClick={() => handleMoveItem(section.label, item.href, 'down')}
+                                                                    >
+                                                                        <ArrowDown className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                            <IconComponent name={item.icon as string} />
+                                                            <span className="text-sm flex-1">{item.label}</span>
+                                                            {isRoomCustom(item) && (
+                                                                <>
+                                                                    <Badge variant="outline">Custom</Badge>
+                                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={() => handleDeleteRoom(section.label, item.href)}>
+                                                                        <Trash2 className="h-4 w-4"/>
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                }}
                                             </Draggable>
                                         ))}
                                         {provided.placeholder}

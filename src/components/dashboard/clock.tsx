@@ -25,8 +25,8 @@ export default function Clock() {
   };
 
   return (
-    <div className="text-sm font-medium text-muted-foreground tabular-nums">
+    <span className="text-xs font-medium text-muted-foreground tabular-nums whitespace-nowrap">
       {time ? formatTime(time) : '...'}
-    </div>
+    </span>
   );
 }

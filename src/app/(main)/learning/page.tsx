@@ -4,15 +4,17 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreVertical, BookOpen, CheckCircle, Target, Link as LinkIcon, Edit, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { PlusCircle, MoreVertical, BookOpen, CheckCircle, Target, Link as LinkIcon, Edit, Trash2, ExternalLink, Copy } from 'lucide-react';
+import { cn, copyToClipboard } from '@/lib/utils';
 import type { LearningResource, LearningResourceStatus } from '@/lib/types';
 import AddResourceDialog from '@/components/learning/add-resource-dialog';
 import KpiCard from '@/components/dashboard/kpi-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger } from '@/components/ui/context-menu';
 import { useApp } from '@/components/layout/app-provider';
+import { useHover } from '@/components/layout/hover-context';
 import { format } from 'date-fns';
 
 const statusConfig: Record<LearningResourceStatus, { label: string; icon: React.ElementType, color: string }> = {
@@ -23,6 +25,7 @@ const statusConfig: Record<LearningResourceStatus, { label: string; icon: React.
 
 export default function LearningPage() {
   const { learningResources, setLearningResources } = useApp();
+  const { setHoveredItem } = useHover();
   const [isClient, setIsClient] = useState(false);
   const [isAddResourceOpen, setIsAddResourceOpen] = useState(false);
   const [resourceToEdit, setResourceToEdit] = useState<LearningResource | undefined>(undefined);
@@ -95,47 +98,94 @@ export default function LearningPage() {
           
           <div className="space-y-4">
             {learningResources.length > 0 ? learningResources.map(resource => (
-                <Card key={resource.id} className="bg-card/50 hover:shadow-lg transition-shadow">
-                    <CardContent className="p-4 flex items-start gap-4">
-                        <div className="flex-1">
-                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline flex items-center gap-2">
-                                {resource.title} <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                            </a>
-                            <p className="text-sm text-muted-foreground mt-1 capitalize">{resource.type}</p>
-                            {resource.notes && <p className="text-sm text-foreground mt-2 pt-2 border-t">{resource.notes}</p>}
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <Badge variant="outline" className="h-6">
-                                <div className={cn("h-2 w-2 rounded-full mr-2", statusConfig[resource.status].color)}></div>
-                                {statusConfig[resource.status].label}
-                            </Badge>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleOpenEditDialog(resource)}>
-                                        <Edit className="mr-2 h-4 w-4" /> Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateStatus(resource.id, 'todo')}>
-                                        <Target className="mr-2 h-4 w-4" /> To Do
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateStatus(resource.id, 'in-progress')}>
-                                        <BookOpen className="mr-2 h-4 w-4" /> In Progress
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateStatus(resource.id, 'completed')}>
-                                        <CheckCircle className="mr-2 h-4 w-4" /> Completed
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteResource(resource.id)}>
-                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                    </CardContent>
-                </Card>
+                <ContextMenu key={resource.id}>
+                    <ContextMenuTrigger>
+                        <Card 
+                            className="bg-card/50 hover:shadow-lg transition-shadow"
+                            onMouseEnter={() => setHoveredItem({ 
+                                type: 'learning', 
+                                data: { 
+                                    ...resource, 
+                                    onEdit: () => handleOpenEditDialog(resource),
+                                    onDelete: () => handleDeleteResource(resource.id)
+                                } 
+                            })}
+                            onMouseLeave={() => setHoveredItem(null)}
+                        >
+                            <CardContent className="p-4 flex items-start gap-4">
+                                {resource.icon ? (
+                                    <div className="text-3xl flex-shrink-0 flex items-center justify-center h-12 w-12 bg-muted/30 rounded-lg overflow-hidden">
+                                        {(resource.icon.startsWith('data:image') || resource.icon.startsWith('http')) ? (
+                                            <img src={resource.icon} alt="Icon" className="h-full w-full object-cover" />
+                                        ) : (
+                                            resource.icon
+                                        )}
+                                    </div>
+                                ) : null}
+                                <div className="flex-1">
+                                    <a href={resource.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline flex items-center gap-2">
+                                        {resource.title} <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                                    </a>
+                                    <p className="text-sm text-muted-foreground mt-1 capitalize">{resource.type}</p>
+                                    {resource.notes && <p className="text-sm text-foreground mt-2 pt-2 border-t">{resource.notes}</p>}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <Badge variant="outline" className="h-6">
+                                        <div className={cn("h-2 w-2 rounded-full mr-2", statusConfig[resource.status].color)}></div>
+                                        {statusConfig[resource.status].label}
+                                    </Badge>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => handleOpenEditDialog(resource)}>
+                                                <Edit className="mr-2 h-4 w-4" /> Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleUpdateStatus(resource.id, 'todo')}>
+                                                <Target className="mr-2 h-4 w-4" /> To Do
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleUpdateStatus(resource.id, 'in-progress')}>
+                                                <BookOpen className="mr-2 h-4 w-4" /> In Progress
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleUpdateStatus(resource.id, 'completed')}>
+                                                <CheckCircle className="mr-2 h-4 w-4" /> Completed
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteResource(resource.id)}>
+                                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-56">
+                        <ContextMenuItem onClick={() => handleOpenEditDialog(resource)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                        </ContextMenuItem>
+                        <ContextMenuSub>
+                            <ContextMenuSubTrigger>Status</ContextMenuSubTrigger>
+                            <ContextMenuSubContent>
+                                <ContextMenuItem onClick={() => handleUpdateStatus(resource.id, 'todo')}>
+                                    <Target className="mr-2 h-4 w-4" /> To Do
+                                </ContextMenuItem>
+                                <ContextMenuItem onClick={() => handleUpdateStatus(resource.id, 'in-progress')}>
+                                    <BookOpen className="mr-2 h-4 w-4" /> In Progress
+                                </ContextMenuItem>
+                                <ContextMenuItem onClick={() => handleUpdateStatus(resource.id, 'completed')}>
+                                    <CheckCircle className="mr-2 h-4 w-4" /> Completed
+                                </ContextMenuItem>
+                            </ContextMenuSubContent>
+                        </ContextMenuSub>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem className="text-destructive" onClick={() => handleDeleteResource(resource.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </ContextMenuItem>
+                    </ContextMenuContent>
+                </ContextMenu>
             )) : (
                 <div className="text-center py-12">
                     <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />

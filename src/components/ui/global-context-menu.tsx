@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useHover } from '@/components/layout/hover-context';
+import { useApp } from '@/components/layout/app-provider';
+import { copyToClipboard } from '@/lib/utils';
 import { 
     Copy, 
     ClipboardPaste, 
@@ -9,11 +12,15 @@ import {
     ArrowLeft, 
     ArrowRight,
     Edit,
-    Trash
+    Trash,
+    CheckCircle,
+    ExternalLink
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function GlobalContextMenu() {
+    const { hoveredItem } = useHover();
+    const { setTasks, setNetworkContacts, setLearningResources } = useApp();
     const [visible, setVisible] = useState(false);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [hasEdit, setHasEdit] = useState(false);
@@ -93,7 +100,7 @@ export default function GlobalContextMenu() {
     return (
         <div 
             ref={menuRef}
-            className="fixed z-[100] min-w-[160px] bg-popover text-popover-foreground border rounded-md shadow-md p-1 animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-[100] min-w-[160px] max-h-[300px] overflow-y-auto bg-popover text-popover-foreground border rounded-md shadow-md p-1 animate-in fade-in zoom-in-95 duration-100"
             style={{ top: position.y, left: position.x }}
             onClick={(e) => e.stopPropagation()}
         >
@@ -119,6 +126,82 @@ export default function GlobalContextMenu() {
                 
                 <div className="h-px bg-border my-1" />
 
+                {/* Context Specific Actions */}
+                {hoveredItem?.type === 'task' && hoveredItem.data && (
+                    <>
+                        <button 
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground w-full text-left"
+                            onClick={() => {
+                                const task = hoveredItem.data;
+                                setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t));
+                                setVisible(false);
+                            }}
+                        >
+                            <CheckCircle className="h-4 w-4" /> {hoveredItem.data.completed ? 'Mark Incomplete' : 'Mark Complete'}
+                        </button>
+                        <button 
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground w-full text-left text-destructive"
+                            onClick={() => {
+                                const task = hoveredItem.data;
+                                if (confirm('Delete this task?')) {
+                                    setTasks(prev => prev.filter(t => t.id !== task.id));
+                                }
+                                setVisible(false);
+                            }}
+                        >
+                            <Trash className="h-4 w-4" /> Delete Task
+                        </button>
+                        <div className="h-px bg-border my-1" />
+                    </>
+                )}
+
+                {hoveredItem?.type === 'contact' && hoveredItem.data && (
+                    <>
+                         <button 
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground w-full text-left"
+                            onClick={() => {
+                                // We can't easily trigger the specific edit dialog from here without more complex state management
+                                // But we can at least support deletion
+                                const contact = hoveredItem.data;
+                                if (confirm(`Delete contact ${contact.name}?`)) {
+                                    setNetworkContacts(prev => prev.filter(c => c.id !== contact.id));
+                                }
+                                setVisible(false);
+                            }}
+                        >
+                            <Trash className="h-4 w-4" /> Delete Contact
+                        </button>
+                        <div className="h-px bg-border my-1" />
+                    </>
+                )}
+
+                {hoveredItem?.type === 'learning' && hoveredItem.data && (
+                     <>
+                        <button 
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground w-full text-left"
+                            onClick={() => {
+                                window.open(hoveredItem.data.url, '_blank');
+                                setVisible(false);
+                            }}
+                        >
+                            <ExternalLink className="h-4 w-4" /> Open Resource
+                        </button>
+                         <button 
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground w-full text-left text-destructive"
+                            onClick={() => {
+                                const resource = hoveredItem.data;
+                                if (confirm(`Delete resource ${resource.title}?`)) {
+                                    setLearningResources(prev => prev.filter(r => r.id !== resource.id));
+                                }
+                                setVisible(false);
+                            }}
+                        >
+                            <Trash className="h-4 w-4" /> Delete Resource
+                        </button>
+                        <div className="h-px bg-border my-1" />
+                    </>
+                )}
+
                 {hasEdit && (
                     <>
                         <button 
@@ -135,7 +218,7 @@ export default function GlobalContextMenu() {
                     <button 
                         className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground w-full text-left"
                         onClick={() => { 
-                            navigator.clipboard.writeText(window.getSelection()?.toString() || ''); 
+                            copyToClipboard(window.getSelection()?.toString() || ''); 
                             setVisible(false); 
                         }}
                     >

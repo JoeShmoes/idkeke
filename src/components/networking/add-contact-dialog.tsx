@@ -34,6 +34,8 @@ export default function AddContactDialog({ isOpen, onOpenChange, onSave, contact
   const [company, setCompany] = useState('');
   const [lastContacted, setLastContacted] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState('');
+  const [icon, setIcon] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -43,26 +45,59 @@ export default function AddContactDialog({ isOpen, onOpenChange, onSave, contact
             setCompany(contactToEdit.company);
             setLastContacted(new Date(contactToEdit.lastContacted));
             setNotes(contactToEdit.notes || '');
+            setIcon(contactToEdit.icon || '');
         } else {
             setName('');
             setRole('');
             setCompany('');
             setLastContacted(new Date());
             setNotes('');
+            setIcon('');
         }
     }
   }, [contactToEdit, isOpen])
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setIcon(event.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !role.trim() || !company.trim() || !lastContacted) return;
-    onSave({ name, role, company, lastContacted: lastContacted.toISOString(), notes });
+    onSave({ 
+        name, 
+        role, 
+        company, 
+        lastContacted: lastContacted.toISOString(), 
+        notes,
+        icon 
+    });
     onOpenChange(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{contactToEdit ? 'Edit Contact' : 'Add New Contact'}</DialogTitle>
@@ -101,6 +136,77 @@ export default function AddContactDialog({ isOpen, onOpenChange, onSave, contact
                 placeholder="e.g., Innovate Inc." 
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="icon">Icon (Optional)</Label>
+              <div className="flex flex-col gap-2">
+                <div 
+                    className={cn(
+                        "border-2 border-dashed rounded-md p-4 flex flex-col items-center justify-center cursor-pointer transition-colors",
+                        isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:border-primary/50"
+                    )}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => document.getElementById('icon-upload')?.click()}
+                >
+                    {icon ? (
+                        <div className="flex items-center gap-2">
+                            {(icon.startsWith('data:image') || icon.startsWith('http')) ? (
+                                <img src={icon} alt="Preview" className="h-10 w-10 object-cover rounded-md" />
+                            ) : (
+                                <span className="text-2xl">{icon}</span>
+                            )}
+                            <span className="text-sm text-muted-foreground">Click or Drop to change</span>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center text-center text-sm text-muted-foreground">
+                            <span className="text-2xl mb-2">📥</span>
+                            <span>Drag & Drop image or Click to Upload</span>
+                            <span className="text-xs opacity-70">or type an emoji below</span>
+                        </div>
+                    )}
+                    <input 
+                        id="icon-upload" 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                    setIcon(event.target?.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        }} 
+                    />
+                </div>
+                <div className="flex gap-2">
+                    <Input 
+                        id="icon" 
+                        value={icon} 
+                        onChange={(e) => setIcon(e.target.value)} 
+                        placeholder="e.g., 👤 or Custom Icon" 
+                        className="flex-1"
+                    />
+                    <div className="flex gap-1">
+                        {['👤', '👔', '💼', '🏢', '🤝', '⭐'].map(emoji => (
+                            <Button 
+                                key={emoji} 
+                                type="button" 
+                                variant="outline" 
+                                size="icon"
+                                onClick={() => setIcon(emoji)}
+                                className="h-10 w-10"
+                            >
+                                {emoji}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+              </div>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="lastContacted">Last Contacted</Label>

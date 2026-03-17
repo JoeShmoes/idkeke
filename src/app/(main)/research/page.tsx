@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import ResearchSidebar from '@/components/research/research-sidebar';
 import ResearchWorkspace from '@/components/research/research-workspace';
 import { useApp } from '@/components/layout/app-provider';
@@ -42,6 +42,7 @@ export default function ResearchPage() {
     const { researchSessions, setResearchSessions } = useApp();
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [isClient, setIsClient] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -130,13 +131,15 @@ export default function ResearchPage() {
             const existingSession = researchSessions.find(s => s.topic.toLowerCase() === queryFromUrl.toLowerCase());
             if (existingSession) {
                 setActiveSessionId(existingSession.id);
+                router.replace('/research');
             } else {
                 handleNewSearch(queryFromUrl);
+                router.replace('/research');
             }
-        } else if (isClient && researchSessions.length > 0 && !activeSessionId) {
+        } else if (isClient && researchSessions.length > 0 && !activeSessionId && !isLoading) {
             setActiveSessionId(researchSessions[0].id);
         }
-    }, [searchParams, isClient, researchSessions, handleNewSearch, activeSessionId]);
+    }, [searchParams, isClient, researchSessions, handleNewSearch, activeSessionId, isLoading, router]);
     
     
     const handleSelectSession = (sessionId: string) => {

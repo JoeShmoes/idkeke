@@ -275,8 +275,8 @@ if (!gotTheLock) {
                 });
                 response.on('end', () => {
                     if (response.statusCode === 200) {
-                         // Fix relative links
-                         const fixedHtml = data.toString().replace(/href="\.\//g, 'target="_blank" href="https://en.wikipedia.org/api/rest_v1/page/html/');
+                         // Fix relative links (do not force _blank)
+                         const fixedHtml = data.toString().replace(/href="\.\//g, 'href="https://en.wikipedia.org/api/rest_v1/page/html/');
                          resolve({ html: fixedHtml });
                     } else {
                          resolve({ error: `Wikipedia API Error: ${response.statusCode}` });
@@ -293,6 +293,185 @@ if (!gotTheLock) {
       }
   });
 
+  // Handle Web Search (DuckDuckGo Scraping + Google News RSS Fallback)
+   ipcMain.handle('web-search', async (event, query) => {
+     try {
+       const { net } = require('electron');
+       // Dynamic import for Cheerio (ESM)
+       let cheerio;
+       try {
+          cheerio = await import('cheerio');
+          if (cheerio.default) cheerio = cheerio.default;
+       } catch (e) {
+          console.error('Failed to load cheerio:', e);
+          return { error: 'Failed to load scraping library' };
+       }
+
+       // Helper to fetch URL
+       const fetchUrl = (url) => {
+         return new Promise((resolve, reject) => {
+            const request = net.request(url);
+            request.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+            request.on('response', (response) => {
+                let data = '';
+                response.on('data', (chunk) => { data += chunk; });
+                response.on('end', () => resolve(data));
+            });
+            request.on('error', (err) => reject(err));
+            request.end();
+         });
+       };
+
+       // 1. Try DuckDuckGo HTML
+       try {
+           const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+           const ddgHtml = await fetchUrl(ddgUrl);
+           const $ = cheerio.load(ddgHtml);
+           const results = [];
+           
+           $('.result').each((i, el) => {
+               const $el = $(el);
+               const title = $el.find('.result__a').text().trim() || $el.find('.result__title').text().trim();
+               let link = $el.find('.result__a').attr('href') || $el.find('.result__url').attr('href');
+               const snippet = $el.find('.result__snippet').text().trim();
+               
+               if (link && link.startsWith('/l/?')) {
+                  // Attempt to extract real URL from DDG redirect
+                  try {
+                    const urlParams = new URLSearchParams(link);
+                    if (urlParams.get('uddg')) link = urlParams.get('uddg');
+                  } catch(e) {}
+               }
+
+               if (title && link && snippet) {
+                   results.push({ title, link, snippet, source: 'DuckDuckGo' });
+               }
+           });
+
+           if (results.length > 0) {
+               return { results: results.slice(0, 8) };
+           }
+       } catch (e) {
+           console.error('DDG Search failed:', e);
+       }
+
+       // 2. Fallback: Google News RSS
+       try {
+           const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+           const rssXml = await fetchUrl(rssUrl);
+           const $ = cheerio.load(rssXml, { xmlMode: true });
+           const results = [];
+
+           $('item').each((i, el) => {
+               const $el = $(el);
+               const title = $el.find('title').text();
+               const link = $el.find('link').text();
+               const snippet = $el.find('description').text().replace(/<[^>]*>/g, ''); // Strip HTML
+               const pubDate = $el.find('pubDate').text();
+
+               if (title && link) {
+                   results.push({ 
+                       title, 
+                       link, 
+                       snippet: `${pubDate}: ${snippet}`,
+                       source: 'Google News'
+                   });
+               }
+           });
+
+           return { results: results.slice(0, 8) };
+       } catch (e) {
+           return { error: 'All search methods failed', details: e.message };
+       }
+
+     } catch (error) {
+       return { error: error.message };
+     }
+   });
+
+  // Helper: Determine if query needs web search
+  function needsWebSearch(text) {
+    const searchKeywords = [
+      'latest', 'recent', 'today', 'this week', 'this month', 'current',
+      'news', 'breaking', 'happening now', 'just announced', 'released',
+      'tell me about', 'search for', 'find information', 'what are the', 
+      'any updates', 'new developments', 'what is happening',
+    ];
+    const lowerText = text.toLowerCase();
+    return searchKeywords.some(keyword => lowerText.includes(keyword));
+  }
+
+  // Helper: Fetch web results using DuckDuckGo HTML lite endpoint
+  async function fetchWebResults(query) {
+    try {
+      const response = await fetch(`https://lite.duckduckgo.com/lite?q=${encodeURIComponent(query)}&t=h_`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!response.ok) return '';
+
+      const html = await response.text();
+      
+      // Parse DuckDuckGo lite results - links are wrapped in DuckDuckGo redirect URLs
+      // Format: href="//duckduckgo.com/l/?uddg=<encoded_real_url>&..."
+      const linkRegex = /href="\/\/duckduckgo\.com\/l\/\?uddg=([^&"]+)/gi;
+      const titleRegex = /<a[^>]*href="\/\/duckduckgo\.com\/l\/\?uddg=[^"]*"[^>]*>(.*?)<\/a>/gi;
+      
+      const decodedLinks = [];
+      let urlMatch;
+      
+      // Extract and decode URLs
+      while ((urlMatch = linkRegex.exec(html))) {
+        try {
+          const decodedUrl = decodeURIComponent(urlMatch[1]);
+          if (decodedUrl && !decodedUrl.includes('duckduckgo.com')) {
+            decodedLinks.push({ url: decodedUrl, title: '' });
+          }
+        } catch (e) {
+          // Skip malformed URLs
+        }
+      }
+      
+      // Extract and match titles
+      let titleIndex = 0;
+      const titleMatches = html.matchAll(/<a[^>]*href="\/\/duckduckgo\.com\/l\/\?uddg=[^"]*"[^>]*>(.*?)<\/a>/gi);
+      for (const match of titleMatches) {
+        if (decodedLinks[titleIndex]) {
+          let title = match[1].replace(/<[^>]*>/g, '').trim();
+          // Decode HTML entities
+          title = title
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#x27;/g, "'")
+            .replace(/&#39;/g, "'");
+          decodedLinks[titleIndex].title = title;
+        }
+        titleIndex++;
+      }
+
+      // Format results for AI context
+      const results = [];
+      for (let i = 0; i < Math.min(5, decodedLinks.length); i++) {
+        const item = decodedLinks[i];
+        if (item.url) {
+          const displayTitle = item.title ? item.title.substring(0, 100) : item.url.substring(0, 60);
+          results.push(`- ${displayTitle} (${item.url})`);
+        }
+      }
+
+      return results.length > 0
+        ? `\n**Search Results for "${query}":**\n${results.join('\n')}\n`
+        : '';
+    } catch (error) {
+      console.error('Web search failed:', error);
+      return '';
+    }
+  }
+
   // Handle AI Chat
   ipcMain.handle('ai-chat', async (event, { messages, mode }) => {
     const apiKey = process.env.MISTRAL_API_KEY;
@@ -303,6 +482,29 @@ if (!gotTheLock) {
     }
 
     try {
+        // Check if the last user message needs web search
+        let messagesForMistral = messages;
+        const lastMessage = messages?.[messages.length - 1];
+        if (lastMessage?.role === 'user' && needsWebSearch(lastMessage.content)) {
+          try {
+            const searchResults = await fetchWebResults(lastMessage.content);
+            if (searchResults) {
+              // Inject search results as a separate assistant message so the
+              // model can clearly see and cite exact links.
+              messagesForMistral = [
+                ...messages.slice(0, -1),
+                {
+                  role: 'assistant',
+                  content: `Search results for "${lastMessage.content}":\n${searchResults}`,
+                },
+                lastMessage,
+              ];
+            }
+          } catch (e) {
+            console.error('Failed to fetch search results:', e);
+          }
+        }
+
         const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -311,7 +513,13 @@ if (!gotTheLock) {
             },
             body: JSON.stringify({
                 model: 'mistral-medium',
-                messages,
+                messages: [
+                  {
+                    role: 'system',
+                    content: `You have access to real-time web search results. When answering, YOU MUST ONLY use information from the search results provided in the conversation (the assistant message titled "Search results"). Do NOT invent, assume, or attribute facts to any source not present in those results. At the end of your response, include a **Sources:** section listing each exact URL you relied on, and use inline numeric citations in the body like [1], [2] that reference that Sources list. If the search results do not contain verifiable information for the user's request, explicitly say you could not verify and avoid fabricating answers.`
+                  },
+                  ...messagesForMistral
+                ],
                 max_tokens: mode === 'thinking' ? 1500 : mode === 'deep-research' ? 1200 : 800,
                 temperature: mode === 'thinking' ? 0.5 : mode === 'deep-research' ? 0.3 : 0.7,
             })
@@ -341,7 +549,7 @@ if (!gotTheLock) {
     win.loadURL('http://localhost:9002');
   } else {
     // Online mode: Load the production URL
-    // win.loadURL('https://nexaris-media-web-app.vercel.app');
+    // win.loadURL('https://app.nexarismedia.online/dashboard');
     
     // Offline mode: Load from local export
     win.loadFile(path.join(__dirname, '../out/index.html'));

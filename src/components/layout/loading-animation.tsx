@@ -6,9 +6,9 @@ export default function LoadingAnimation() {
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background dark:bg-gradient-to-br dark:from-[#1A1A1A] dark:to-[#000000] loading-container-animation">
       <div className="flex flex-col items-center gap-4">
         <Logo className="h-24 w-24 text-primary wayne-logo-animation" />
-        <h1 className="text-3xl font-semibold text-foreground opacity-0 wayne-text-animation">
-          Nexaris Module
-        </h1>
+        <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-primary font-medium tracking-widest text-sm animate-pulse whitespace-nowrap">
+          Alfred AI
+        </div>
       </div>
     </div>
   );

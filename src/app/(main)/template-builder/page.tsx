@@ -79,7 +79,7 @@ export default function TemplateBuilderPage() {
                     <CardTitle className="flex items-center gap-2"><Bot /> AI-Powered Suggestions</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <CardDescription>Let Alfred analyze your existing projects and suggest new templates based on recurring patterns.</CardDescription>
+                    <CardDescription>Let Alfred AI analyze your existing projects and suggest new templates based on recurring patterns.</CardDescription>
                 </CardContent>
             </Card>
         </div>

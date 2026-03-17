@@ -1,43 +1,207 @@
-
 import { NextResponse } from 'next/server';
+
+// Helper: Determine if query needs web search
+function needsWebSearch(text: string): boolean {
+  const searchKeywords = [
+    'latest', 'recent', 'today', 'this week', 'this month', 'current',
+    'news', 'breaking', 'happening now', 'just announced', 'released',
+    'tell me about', 'search for', 'find information', 'what are the', 
+    'any updates', 'new developments', 'what is happening',
+  ];
+  const lowerText = text.toLowerCase();
+  return searchKeywords.some(keyword => lowerText.includes(keyword));
+}
+
+// Helper: Fetch web results using DuckDuckGo HTML lite endpoint
+async function fetchWebResults(query: string): Promise<string> {
+  try {
+    const response = await fetch(`https://lite.duckduckgo.com/lite?q=${encodeURIComponent(query)}&t=h_`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      return '';
+    }
+
+    const html = await response.text();
+    
+    // Parse DuckDuckGo lite results - links are wrapped in DuckDuckGo redirect URLs
+    // Format: href="//duckduckgo.com/l/?uddg=<encoded_real_url>&..."
+    const linkRegex = /href="\/\/duckduckgo\.com\/l\/\?uddg=([^&"]+)/gi;
+    const titleRegex = /<a[^>]*href="\/\/duckduckgo\.com\/l\/\?uddg=[^"]*"[^>]*>(.*?)<\/a>/gi;
+    
+    const decodedLinks: any[] = [];
+    let urlMatch;
+    
+    // Extract and decode URLs
+    while ((urlMatch = linkRegex.exec(html))) {
+      try {
+        const decodedUrl = decodeURIComponent(urlMatch[1]);
+        if (decodedUrl && !decodedUrl.includes('duckduckgo.com')) {
+          decodedLinks.push({ url: decodedUrl, title: '' });
+        }
+      } catch (e) {
+        // Skip malformed URLs
+      }
+    }
+    
+    // Extract and match titles
+    let titleIndex = 0;
+    const titleMatches = html.matchAll(/<a[^>]*href="\/\/duckduckgo\.com\/l\/\?uddg=[^"]*"[^>]*>(.*?)<\/a>/gi);
+    for (const match of titleMatches) {
+      if (decodedLinks[titleIndex]) {
+        let title = match[1].replace(/<[^>]*>/g, '').trim();
+        // Decode HTML entities
+        title = title
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#x27;/g, "'")
+          .replace(/&#39;/g, "'");
+        decodedLinks[titleIndex].title = title;
+      }
+      titleIndex++;
+    }
+
+    // Format results for AI context
+    const results: string[] = [];
+    for (let i = 0; i < Math.min(5, decodedLinks.length); i++) {
+      const item = decodedLinks[i];
+      if (item.url) {
+        const displayTitle = item.title ? item.title.substring(0, 100) : item.url.substring(0, 60);
+        results.push(`- ${displayTitle} (${item.url})`);
+      }
+    }
+
+    return results.length > 0
+      ? `Search Results for "${query}":\n${results.join('\n')}`
+      : '';
+  } catch (error) {
+    console.error('Web search failed:', error);
+    return '';
+  }
+}
+
 
 export async function POST(req: Request) {
   try {
-    const { messages, mode } = await req.json();
+    const body = await req.json();
+    let messages = body.messages;
+    const shouldStream = Boolean(body.stream);
+    const maxTokens =
+      typeof body.max_tokens === 'number' && body.max_tokens > 0
+        ? Math.min(body.max_tokens, 4000)
+        : 1024;
 
     const apiKey = process.env.MISTRAL_API_KEY;
+    const model = process.env.MISTRAL_MODEL || 'mistral-small-latest';
+
     if (!apiKey) {
-      const last = Array.isArray(messages) ? messages[messages.length - 1] : null;
-      const fallback = last?.content ? `Alfred: ${last.content}` : 'Alfred: How can I help?';
-      return NextResponse.json({ content: fallback });
+      return NextResponse.json(
+        { error: 'MISTRAL_API_KEY is not defined' },
+        { status: 500 }
+      );
     }
 
-    const resp = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    // Check if the last user message needs web search
+    const lastMessage = messages?.[messages.length - 1];
+    if (lastMessage?.role === 'user' && needsWebSearch(lastMessage.content)) {
+      try {
+        const searchResults = await fetchWebResults(lastMessage.content);
+        if (searchResults) {
+          console.log('[AI Chat] Web search triggered:', lastMessage.content);
+          console.log('[AI Chat] Search results:', searchResults);
+          // Inject search results as a separate assistant message so the model
+          // clearly sees the search results and can cite the exact links.
+          messages = [
+            ...messages.slice(0, -1),
+            {
+              role: 'assistant',
+              content: `SEARCH_RESULTS_RECEIVED:\n${searchResults}`,
+            },
+            lastMessage,
+          ];
+        }
+      } catch (e) {
+        // If search fails, continue without it
+        console.error('[AI Chat] Failed to fetch search results:', e);
+      }
+    }
+
+    const mistralResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'mistral-medium',
-        messages,
-        max_tokens: mode === 'thinking' ? 1500 : mode === 'deep-research' ? 1200 : 800,
-        temperature: mode === 'thinking' ? 0.5 : mode === 'deep-research' ? 0.3 : 0.7,
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: `You have access to real-time web search results. When answering, YOU MUST ONLY use information from the search results provided in the conversation (the assistant message titled "Search results"). Do NOT invent, assume, or attribute facts to any source not present in those results. At the end of your response, include a **Sources:** section listing each exact URL you relied on, and use inline numeric citations in the body like [1], [2] that reference that Sources list. If the search results do not contain verifiable information for the user's request, explicitly say you could not verify and avoid fabricating answers.`
+          },
+          ...messages
+        ],
+        max_tokens: maxTokens,
       }),
     });
 
-    if (!resp.ok) {
-      const details = await resp.text();
-      return NextResponse.json({ error: 'API error', details }, { status: resp.status });
+    if (!mistralResponse.ok) {
+      const status = mistralResponse.status;
+      let details = '';
+      try {
+        const payload = await mistralResponse.json();
+        details = JSON.stringify(payload);
+      } catch {
+        details = await mistralResponse.text();
+      }
+      return NextResponse.json(
+        {
+          error: 'Mistral API error',
+          details,
+          status,
+        },
+        { status }
+      );
     }
 
-    const data = await resp.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content || content.trim() === '') {
-      return NextResponse.json({ content: 'I apologize, but I was unable to generate a response. Please try again.' });
+    const completion = await mistralResponse.json();
+    const content =
+      completion.choices?.[0]?.message?.content ||
+      completion.choices?.[0]?.delta?.content ||
+      '';
+    const finishReason = completion.choices?.[0]?.finish_reason || 'stop';
+
+    if (shouldStream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(String(content || '').trim()));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'X-Used-Model': model,
+          'X-Finish-Reason': finishReason,
+        },
+      });
     }
-    return NextResponse.json({ content });
-  } catch (e) {
-    return NextResponse.json({ error: 'Unexpected error' }, { status: 500 });
+
+    return NextResponse.json({
+      content: String(content || '').trim(),
+      model,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal Server Error', details: String(error) },
+      { status: 500 }
+    );
   }
 }

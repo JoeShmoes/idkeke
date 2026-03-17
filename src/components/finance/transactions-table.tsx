@@ -35,7 +35,7 @@ export function TransactionsTable({ transactions, onEdit, onDelete }: Transactio
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: appSettings.finance.defaultCurrency }).format(amount);
   }
 
-  const privacyClass = appSettings.finance.privacyMode ? 'blur' : '';
+  const privacyClass = appSettings.finance.privacyMode ? 'blur-md select-none' : '';
 
   return (
     <Table>

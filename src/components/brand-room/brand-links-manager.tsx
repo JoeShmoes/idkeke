@@ -6,7 +6,13 @@ import type { BrandProfile, BrandLink } from '@/lib/types';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { PlusCircle, Trash2, Link, Globe, Twitter, Instagram, Facebook } from 'lucide-react';
+import { PlusCircle, Trash2, Link, Globe, Twitter, Instagram, Facebook, ExternalLink, Copy } from 'lucide-react';
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
     Dialog,
     DialogContent,
@@ -59,23 +65,44 @@ export default function BrandLinksManager({ profile, onUpdate }: BrandLinksManag
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {links.map(link => (
-            <div key={link.id} className="group relative border rounded-lg p-4 flex items-center gap-4 transition-shadow hover:shadow-md">
-                <div>
-                    {getIconForUrl(link.url)}
-                </div>
-                <div className="flex-1 overflow-hidden">
-                    <p className="font-semibold truncate">{link.title}</p>
-                    <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:underline truncate block">{link.url}</a>
-                </div>
-                <Button 
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive absolute top-2 right-2"
-                    onClick={() => handleRemoveLink(link.id)}
-                >
-                    <Trash2 className="h-4 w-4" />
-                </Button>
-            </div>
+            <ContextMenu key={link.id}>
+                <ContextMenuTrigger asChild>
+                    <div className="group relative border rounded-lg p-4 flex items-center gap-4 transition-shadow hover:shadow-md cursor-pointer">
+                        <div>
+                            {getIconForUrl(link.url)}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            <p className="font-semibold truncate">{link.title}</p>
+                            <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:underline truncate block">{link.url}</a>
+                        </div>
+                        <Button 
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive absolute top-2 right-2"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveLink(link.id);
+                            }}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto">
+                    <ContextMenuItem onClick={() => window.open(link.url, '_blank')}>
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Open Link
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => copyToClipboard(link.url)}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy URL
+                    </ContextMenuItem>
+                    <ContextMenuItem className="text-destructive" onClick={() => handleRemoveLink(link.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Link
+                    </ContextMenuItem>
+                </ContextMenuContent>
+            </ContextMenu>
         ))}
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>

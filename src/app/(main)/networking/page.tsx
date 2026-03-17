@@ -8,9 +8,12 @@ import { PlusCircle, MoreVertical, Users, CalendarDays } from 'lucide-react';
 import type { NetworkContact } from '@/lib/types';
 import KpiCard from '@/components/dashboard/kpi-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useApp } from '@/components/layout/app-provider';
 import { formatDistanceToNow } from 'date-fns';
+import { cn, copyToClipboard } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import AddContactDialog from '@/components/networking/add-contact-dialog';
 
@@ -19,6 +22,7 @@ export default function NetworkingPage() {
   const [isClient, setIsClient] = useState(false);
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [contactToEdit, setContactToEdit] = useState<NetworkContact | undefined>(undefined);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     setIsClient(true);
@@ -86,40 +90,92 @@ export default function NetworkingPage() {
           </div>
           
           <div className="space-y-4">
-            {networkContacts.length > 0 ? networkContacts.map(contact => (
-                <Card key={contact.id} className="bg-card/50 hover:shadow-lg transition-shadow">
-                    <CardContent className="p-4 flex items-start gap-4">
-                        <Avatar>
-                            <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                            <p className="font-semibold">{contact.name}</p>
-                            <p className="text-sm text-muted-foreground">{contact.role} at {contact.company}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Last contacted: {formatDistanceToNow(new Date(contact.lastContacted), { addSuffix: true })}
-                            </p>
-                            {contact.notes && <p className="text-sm text-foreground mt-2 pt-2 border-t">{contact.notes}</p>}
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleOpenEditDialog(contact)}>
-                                        Edit Contact
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteContact(contact.id)}>
-                                        Delete Contact
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                    </CardContent>
-                </Card>
-            )) : (
+            {networkContacts.length > 0 ? networkContacts.map(contact => {
+                            return (
+                                <ContextMenu key={contact.id}>
+                                    <ContextMenuTrigger>
+                                        <Card 
+                                            data-selectable="true"
+                                            data-id={contact.id}
+                                            className={cn(
+                                                "bg-card/50 hover:shadow-lg transition-all flex flex-col cursor-pointer",
+                                                selectedIds.includes(contact.id) && "ring-2 ring-primary bg-primary/10"
+                                            )}
+                                            onClick={(e) => handleToggleSelection(contact.id, e)}
+                                        >
+                                            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-10 w-10">
+                                                        <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <CardTitle className="text-base font-semibold">{contact.name}</CardTitle>
+                                                        <CardDescription>{contact.role} at {contact.company}</CardDescription>
+                                                    </div>
+                                                </div>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-2">
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => handleOpenEditDialog(contact)}>
+                                                            Edit Contact
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteContact(contact.id)}>
+                                                            Delete Contact
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </CardHeader>
+                                            <CardContent className="mt-4 flex-grow">
+                                                <div className="space-y-2 text-sm">
+                                                    <div className="flex items-center text-muted-foreground">
+                                                        <Mail className="mr-2 h-3 w-3" />
+                                                        {contact.email}
+                                                    </div>
+                                                    {contact.phone && (
+                                                        <div className="flex items-center text-muted-foreground">
+                                                            <Phone className="mr-2 h-3 w-3" />
+                                                            {contact.phone}
+                                                        </div>
+                                                    )}
+                                                    {contact.linkedIn && (
+                                                        <div className="flex items-center text-muted-foreground">
+                                                            <Linkedin className="mr-2 h-3 w-3" />
+                                                            <a href={contact.linkedIn} target="blank" rel="noopener noreferrer" className="hover:underline truncate max-w-[200px]">
+                                                                LinkedIn Profile
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                    {contact.tags.map(tag => (
+                                                        <Badge key={tag} variant="secondary" className="text-xs">
+                                                            {tag}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex justify-between items-center">
+                                                    <span>Last Contacted: {formatDistanceToNow(new Date(contact.lastContacted), { addSuffix: true })}</span>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent className="w-56">
+                                        <ContextMenuItem onClick={() => handleOpenEditDialog(contact)}>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit Contact
+                                        </ContextMenuItem>
+                                        <ContextMenuItem className="text-destructive" onClick={() => handleDeleteContact(contact.id)}>
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete Contact
+                                        </ContextMenuItem>
+                                    </ContextMenuContent>
+                                </ContextMenu>
+                            )
+                        }) : (
                 <div className="text-center py-12">
                     <Users className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-2 text-sm font-semibold text-foreground">No contacts yet</h3>

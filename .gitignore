@@ -39,3 +39,6 @@ new-repo/
 tsconfig.tsbuildinfo
 
 .vercel
+
+.vercel
+.env*.local

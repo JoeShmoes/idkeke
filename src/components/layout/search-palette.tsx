@@ -1,9 +1,9 @@
-
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, useMemo, useRef, createContext, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { useHotkeys } from '@/hooks/use-hotkeys-safe';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
@@ -13,13 +13,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '../ui/button';
-import { CheckSquare, Notebook, Search, Users, ClipboardCheck, Landmark, Building, BookOpen, HeartPulse, Folder as FolderIcon, Globe } from 'lucide-react';
+import { Search, Folder as FolderIcon, ArrowRight, Command } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useApp } from './app-provider';
 import type { Task, Note, NetworkContact, Project, Client, Account, Asset, LearningResource, Activity, VaultFile } from '@/lib/types';
-import { allNavItems } from '@/lib/nav-items';
-
+import { allNavItems, iconMap } from '@/lib/nav-items';
+import Logo from '@/components/logo';
 
 interface CommandPaletteContextType {
   open: boolean;
@@ -45,25 +45,11 @@ export const useCommandPalette = () => {
     return context;
 };
 
-
 interface SearchableRoom {
     href: string;
     label: string;
     icon: React.ElementType;
     type: 'room';
-}
-
-interface SearchableWebSearch {
-    href: string;
-    label: string;
-    icon: React.ElementType;
-    type: 'web search';
-}
-
-interface SearchableNote extends Note {
-    type: 'note';
-    href: string;
-    icon: React.ElementType;
 }
 
 interface SearchableTask extends Task {
@@ -72,7 +58,7 @@ interface SearchableTask extends Task {
     icon: React.ElementType;
 }
 
-interface SearchableContact extends NetworkContact {
+interface SearchableContact extends Omit<NetworkContact, 'icon'> {
     type: 'contact';
     href: string;
     icon: React.ElementType;
@@ -102,7 +88,7 @@ interface SearchableAsset extends Asset {
     icon: React.ElementType;
 }
 
-interface SearchableLearningResource extends Omit<LearningResource, 'type'> {
+interface SearchableLearningResource extends Omit<LearningResource, 'type' | 'icon'> {
     type: 'learning resource';
     href: string;
     icon: React.ElementType;
@@ -122,11 +108,8 @@ interface SearchableVaultFile extends VaultFile {
 
 type SearchableItem = 
     | SearchableRoom 
-    | SearchableWebSearch
-    | SearchableNote 
     | SearchableTask 
-    | SearchableContact
-    | SearchableProject
+    | SearchableContact  | SearchableProject
     | SearchableClient
     | SearchableAccount
     | SearchableAsset
@@ -145,8 +128,9 @@ export default function SearchPalette() {
         appSettings, isMac 
     } = useApp();
     const shortcut = appSettings.shortcuts.toggleSearch;
-    const listRef = useRef<HTMLDivElement>(null);
-    const activeItemRef = useRef<HTMLDivElement>(null);
+    
+    // We use a ref map to store references to all list items
+    const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     useHotkeys(
       shortcut.keys.join('+'),
@@ -157,23 +141,27 @@ export default function SearchPalette() {
       { enableOnFormTags: false, enabled: shortcut.keys.length > 0 } as any
     );
 
-
     const allItems: SearchableItem[] = useMemo(() => {
-        const navItems: SearchableRoom[] = allNavItems.flatMap(group => group.items).map(item => ({...item, type: 'room', icon: item.icon as React.ElementType}));
-
-        const webSearchItem: SearchableWebSearch[] = searchTerm.trim() ? [{
-            href: `/research?query=${encodeURIComponent(searchTerm)}`,
-            label: `Search web for "${searchTerm}"`,
-            icon: Globe,
-            type: 'web search',
-        }] : [];
-
-        const notesForSearch: SearchableNote[] = Array.isArray(notes) ? notes.map(note => ({
-            ...note,
-            type: 'note' as const,
-            href: `/notes?noteId=${note.id}`,
-            icon: Notebook,
-          })) : [];
+        const navItems: SearchableRoom[] = allNavItems
+          .flatMap(group => group.items)
+          .map(item => {
+            // Special handling for AI Room to use App Logo
+            if (item.href === '/ai-room') {
+                return {
+                    href: item.href,
+                    label: item.label, // Should be 'Alfred' from nav-items
+                    type: 'room' as const,
+                    icon: (props: any) => <Logo {...props} />,
+                };
+            }
+            const Icon = iconMap[item.icon] || FolderIcon;
+            return {
+              href: item.href,
+              label: item.label,
+              type: 'room' as const,
+              icon: Icon,
+            };
+          });
 
         const tasksForSearch: SearchableTask[] = Array.isArray(tasks) ? tasks.map(task => ({
             ...task,
@@ -181,52 +169,53 @@ export default function SearchPalette() {
             label: task.name,
             type: 'task' as const,
             href: '/tasks',
-            icon: CheckSquare,
+            icon: iconMap['ListTodo'] || FolderIcon,
           })) : [];
 
           const contactsForSearch: SearchableContact[] = Array.isArray(networkContacts) ? networkContacts.map(contact => ({
             ...contact,
             type: 'contact' as const,
             href: '/networking',
-            icon: Users,
+            icon: iconMap['Network'] || FolderIcon,
           })) : [];
-
+    
           const projectsForSearch: SearchableProject[] = Array.isArray(projects) ? projects.map(p => ({
-            ...p, type: 'project' as const, href: '/project-board', icon: ClipboardCheck
+            ...p, type: 'project' as const, href: '/project-board', icon: iconMap['KanbanSquare'] || FolderIcon
           })) : [];
         
           const clientsForSearch: SearchableClient[] = Array.isArray(clients) ? clients.map(c => ({
-            ...c, type: 'client' as const, href: '/clients', icon: Users
+            ...c, type: 'client' as const, href: '/clients', icon: iconMap['Users'] || FolderIcon
           })) : [];
-
+    
           const accountsForSearch: SearchableAccount[] = Array.isArray(accounts) ? accounts.map(a => ({
-            ...a, type: 'account' as const, href: '/finance', icon: Landmark
+            ...a, type: 'account' as const, href: '/finance', icon: iconMap['Wallet'] || FolderIcon
           })) : [];
         
           const assetsForSearch: SearchableAsset[] = Array.isArray(assets) ? assets.map(a => ({
-            ...a, type: 'asset' as const, href: '/asset-tracker', icon: Building
+            ...a, type: 'asset' as const, href: '/asset-tracker', icon: iconMap['Building'] || FolderIcon
           })) : [];
-
+    
           const learningForSearch: SearchableLearningResource[] = Array.isArray(learningResources) ? learningResources.map(l => ({
-            ...l, type: 'learning resource' as const, href: '/learning', icon: BookOpen
+            ...l, type: 'learning resource' as const, href: '/learning', icon: iconMap['GraduationCap'] || FolderIcon
           })) : [];
-
+    
           const activitiesForSearch: SearchableActivity[] = Array.isArray(activities) ? activities.map(a => ({
-            ...a, type: 'activity' as const, href: '/health', icon: HeartPulse
+            ...a, type: 'activity' as const, href: '/health', icon: iconMap['Activity'] || FolderIcon
           })) : [];
-
+    
           const vaultFilesForSearch: SearchableVaultFile[] = Array.isArray(vaultFiles) ? vaultFiles.map(f => ({
-            ...f, type: 'file' as const, href: '/vilefault', icon: FolderIcon
+            ...f, type: 'file' as const, href: '/file-vault', icon: iconMap['Lock'] || FolderIcon
           })) : [];
 
+          const includeTasks = appSettings.commandPalette?.includeTasks ?? true;
+          const includeContacts = appSettings.commandPalette?.includeContacts ?? true;
+          const includeProjects = appSettings.commandPalette?.includeProjects ?? true;
 
         return [
-            ...webSearchItem,
             ...navItems, 
-            ...notesForSearch, 
-            ...tasksForSearch, 
-            ...contactsForSearch,
-            ...projectsForSearch,
+            ...(includeTasks ? tasksForSearch : []), 
+            ...(includeContacts ? contactsForSearch : []),
+            ...(includeProjects ? projectsForSearch : []),
             ...clientsForSearch,
             ...accountsForSearch,
             ...assetsForSearch,
@@ -234,16 +223,14 @@ export default function SearchPalette() {
             ...activitiesForSearch,
             ...vaultFilesForSearch,
         ];
-    }, [notes, tasks, networkContacts, projects, clients, accounts, assets, learningResources, activities, vaultFiles, searchTerm]);
+    }, [notes, tasks, networkContacts, projects, clients, accounts, assets, learningResources, activities, vaultFiles, appSettings.commandPalette]);
 
 
     const filteredItems = useMemo(() => {
-        if (!searchTerm) return allItems.filter(item => item.type === 'room');
+        if (!searchTerm) return allItems.filter(item => item.type === 'room'); // Default view
         const lowerCaseSearch = searchTerm.toLowerCase();
 
         return allItems.filter(item => {
-            if (item.type === 'web search') return true;
-
             const getLabel = (i: SearchableItem): string => {
                 if ('title' in i && i.title) return i.title;
                 if ('name' in i && i.name) return i.name;
@@ -256,22 +243,19 @@ export default function SearchPalette() {
 
             if ('content' in item && item.content) content = item.content;
             else if ('description' in item && item.description) content = item.description;
-            else if ('notes' in item && item.notes) content = item.notes;
             else if ('company' in item && item.company) content = item.company;
 
             return label.toLowerCase().includes(lowerCaseSearch) ||
                    content.toLowerCase().includes(lowerCaseSearch)
-        }
-        );
+        });
     }, [searchTerm, allItems]);
 
+    // Group items for display
     const groupedItems = useMemo(() => {
         return filteredItems.reduce((acc, item) => {
             let key: string;
             switch(item.type) {
-                case 'web search': key = 'Web Search'; break;
-                case 'room': key = 'Rooms'; break;
-                case 'note': key = 'Notes'; break;
+                case 'room': key = 'Navigation'; break;
                 case 'task': key = 'Tasks'; break;
                 case 'contact': key = 'Contacts'; break;
                 case 'project': key = 'Projects'; break;
@@ -283,30 +267,47 @@ export default function SearchPalette() {
                 case 'file': key = 'Files'; break;
                 default: key = 'Other';
             }
-
-            if (!acc[key]) {
-                acc[key] = [];
-            }
+            if (!acc[key]) acc[key] = [];
             acc[key].push(item);
             return acc;
         }, {} as Record<string, SearchableItem[]>);
     }, [filteredItems]);
 
-    const flatItemList = useMemo(() => Object.values(groupedItems).flat(), [groupedItems]);
+    // Flatten for keyboard navigation
+    const flatItemList = useMemo(() => {
+         // Sort groups so Navigation comes first
+         const order = ['Navigation', 'Projects', 'Tasks', 'Files', 'Contacts', 'Clients', 'Accounts', 'Assets', 'Learning', 'Activities', 'Other'];
+         const sortedKeys = Object.keys(groupedItems).sort((a, b) => {
+             const indexA = order.indexOf(a);
+             const indexB = order.indexOf(b);
+             return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+         });
+         
+         return sortedKeys.flatMap(key => groupedItems[key]);
+    }, [groupedItems]);
     
+    // Reset active index when search changes
     useEffect(() => {
       setActiveIndex(0);
     }, [searchTerm]);
 
+    // Handle Scroll - The "Premium" feel fix
     useEffect(() => {
-        if (activeItemRef.current) {
-            activeItemRef.current.scrollIntoView({ block: 'nearest' });
+        const activeElement = itemRefs.current[activeIndex];
+        if (activeElement) {
+            // scrollIntoView with block: 'nearest' ensures it doesn't jump unnecessarily
+            // Use auto behavior for instant scrolling when spamming keys
+            activeElement.scrollIntoView({ block: 'nearest', behavior: 'auto' });
         }
-    }, [activeIndex]);
+    }, [activeIndex, flatItemList]);
 
     const handleSelect = (href: string) => {
-        router.push(href);
         setOpen(false);
+        if (href.startsWith('http')) {
+            window.open(href, '_blank');
+        } else {
+            router.push(href);
+        }
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -322,12 +323,12 @@ export default function SearchPalette() {
                 handleSelect(flatItemList[activeIndex].href);
             }
         }
-    }
+    };
     
     // Reset state on close
     useEffect(() => {
         if(!open) {
-            setSearchTerm('');
+            setTimeout(() => setSearchTerm(''), 200); // Delay clearing to avoid flash
             setActiveIndex(0);
         }
     }, [open]);
@@ -336,106 +337,173 @@ export default function SearchPalette() {
     <>
         <Button
             variant="outline"
-            className="w-full justify-start text-muted-foreground h-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8"
+            className="w-full justify-between text-muted-foreground h-9 px-3 shadow-none bg-muted/50 hover:bg-muted/80 transition-all group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:p-0"
             onClick={() => setOpen(true)}
         >
-            <Search className="h-4 w-4 text-primary group-data-[collapsible=icon]:m-0 md:mr-2" />
-            <span className="group-data-[collapsible=icon]:hidden">Search...</span>
-            <kbd className="pointer-events-none ml-auto hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 group-data-[collapsible=icon]:hidden sm:flex">
+            <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 opacity-50" />
+                <span className="group-data-[collapsible=icon]:hidden text-sm">Search...</span>
+            </div>
+            <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 group-data-[collapsible=icon]:hidden sm:flex shadow-sm">
                 <span className="text-xs">{isMac ? '⌘' : 'Ctrl'}</span>
-                {shortcut.keys.find(k => k !== 'mod')?.toUpperCase()}
+                {shortcut.keys.find(k => k !== 'mod')?.toUpperCase() || 'K'}
             </kbd>
         </Button>
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent 
-            className="p-0 gap-0 max-w-2xl overflow-hidden" 
+            className="p-0 gap-0 max-w-3xl overflow-hidden border-none shadow-2xl bg-popover/95 backdrop-blur-xl ring-1 ring-white/10" 
             onKeyDown={handleKeyDown}
         >
           <DialogHeader className="sr-only">
-            <DialogTitle>Search</DialogTitle>
-            <DialogDescription>Search through all your rooms, notes, tasks, and more.</DialogDescription>
+            <DialogTitle>Command Palette</DialogTitle>
+            <DialogDescription>Search through your workspace</DialogDescription>
           </DialogHeader>
-            <div className='flex items-center border-b px-5'>
-                <Search className="h-5 w-5 text-muted-foreground" />
+            
+            <div className='flex items-center border-b border-white/5 px-4 py-1'>
+                <Search className="h-5 w-5 text-muted-foreground/50 mr-3" />
                 <Input
-                    placeholder="Search rooms, notes, tasks, or the web…"
+                    placeholder="What do you need?"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="border-0 shadow-none focus-visible:ring-0 h-14 text-base bg-transparent placeholder:text-muted-foreground/80"
+                    className="border-0 shadow-none focus-visible:ring-0 h-14 text-lg bg-transparent placeholder:text-muted-foreground/50 px-0"
                     autoFocus
                 />
+                <div className="flex items-center gap-2">
+                </div>
             </div>
-            <ScrollArea className="h-[50vh]">
-                <div className="p-4 space-y-2" ref={listRef}>
-                    {Object.keys(groupedItems).length > 0 ? (
-                    Object.entries(groupedItems).map(([group, items]) => (
-                        <div key={group} className="mb-2">
-                            <p className="text-xs font-semibold text-muted-foreground tracking-wider uppercase px-3 py-1.5">{group}</p>
-                            <div className="space-y-1">
-                                {items.map((item) => {
-                                    const globalIndex = flatItemList.findIndex(i => ('id' in i && 'id' in item) ? i.id === item.id && i.type === item.type : i.href === item.href && i.type === item.type);
-                                    const isActive = globalIndex === activeIndex;
 
-                                    const getDisplayTitle = (i: SearchableItem): string => {
-                                        if ('title' in i && i.title) return i.title;
-                                        if ('name' in i && i.name) return i.name;
-                                        if ('label' in i && i.label) return i.label;
-                                        return 'Untitled';
-                                    }
-                                    const getDisplayContent = (i: SearchableItem) => {
-                                        if (i.type === 'web search') return i.href;
-                                        if ('content' in i && i.content) return i.content.replace(/^#.*?\n\n/, '');
-                                        if ('description' in i && i.description) return i.description;
-                                        if ('notes' in i && i.notes) return i.notes;
-                                        if ('company' in i && i.company) return i.company;
-                                        return null;
-                                    }
-                                    
-                                    const title = getDisplayTitle(item);
-                                    const content = getDisplayContent(item);
-                                    const Icon = item.icon;
-
-                                    return (
-                                        <div
-                                            key={`${item.type}-${'id' in item ? item.id : item.href}`}
-                                            onClick={() => handleSelect(item.href)}
-                                            onMouseMove={() => setActiveIndex(globalIndex)}
-                                            ref={isActive ? activeItemRef : null}
-                                            className={cn(
-                                                "flex items-center justify-between gap-3 p-3 rounded-md transition-colors cursor-pointer group border-l-2", 
-                                                isActive ? 'bg-secondary border-primary' : 'border-transparent hover:bg-secondary'
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-4 overflow-hidden">
-                                                <Icon className={cn("h-5 w-5 text-muted-foreground flex-shrink-0", item.type === 'task' && 'completed' in item && item.completed && "text-green-500")} />
-                                                <div className="flex flex-col overflow-hidden">
-                                                        <span className={cn("text-sm font-medium text-foreground truncate", item.type === 'task' && 'completed' in item && item.completed && "line-through text-muted-foreground")}>
-                                                            {title}
-                                                        </span>
-                                                        {content && (
-                                                            <span className="text-xs text-muted-foreground truncate">{content}</span>
-                                                        )}
-                                                </div>
-                                            </div>
-                                            <div className="text-xs uppercase font-semibold text-muted-foreground bg-secondary/50 px-2 py-1 rounded-full">{item.type}</div>
+            <ScrollArea className="h-[60vh] sm:h-[550px]">
+                <div className="p-2">
+                    {flatItemList.length > 0 ? (
+                         // We iterate by groups to render headers, but we need to map flatItemList to indices
+                         // Actually, standard rendering is fine.
+                         // Let's use the grouped structure for rendering headers
+                        Object.entries(groupedItems).map(([group, items]) => {
+                             if (items.length === 0) return null;
+                             return (
+                                <div key={group} className="mb-4">
+                                    {group !== 'Navigation' && (
+                                        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider sticky top-0 bg-popover/95 backdrop-blur-xl z-10">
+                                            {group}
                                         </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    ))
+                                    )}
+                                    <div className="space-y-0.5">
+                                        {items.map((item) => {
+                                            // Find the global index for this item to match activeIndex
+                                            // Note: flatItemList is sorted by group order, so we can just find it
+                                            const globalIndex = flatItemList.indexOf(item);
+                                            const isActive = globalIndex === activeIndex;
+                                            
+                                            const getDisplayTitle = (i: SearchableItem): string => {
+                                                if ('title' in i && i.title) return i.title;
+                                                if ('name' in i && i.name) return i.name;
+                                                if ('label' in i && i.label) return i.label;
+                                                return 'Untitled';
+                                            }
+                                            const getDisplayContent = (i: SearchableItem) => {
+                                                if ('content' in i && i.content) return i.content.replace(/^#.*?\n\n/, '');
+                                                if ('description' in i && i.description) return i.description;
+                                                if ('company' in i && i.company) return i.company;
+                                                return null;
+                                            }
+                                            
+                                            const title = getDisplayTitle(item);
+                                            const content = getDisplayContent(item);
+                                            const Icon = item.icon;
+
+                                            return (
+                                                <div
+                                                    key={`${item.type}-${'id' in item ? item.id : item.href}`}
+                                                    ref={el => { itemRefs.current[globalIndex] = el; }}
+                                                    onClick={() => {
+                                                        if (item.href.startsWith('http')) {
+                                                            window.open(item.href, '_blank');
+                                                            setOpen(false);
+                                                        } else {
+                                                            handleSelect(item.href);
+                                                        }
+                                                    }}
+                                                    onMouseMove={(e) => {
+                                                        // Prevent mouse hover from hijacking selection during keyboard navigation
+                                                        if (e.movementX !== 0 || e.movementY !== 0) {
+                                                            setActiveIndex(globalIndex);
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        "flex items-center justify-between gap-3 px-3 py-3 rounded-lg transition-all cursor-pointer group relative scroll-mt-10", 
+                                                        isActive ? 'bg-accent/50 text-accent-foreground' : 'text-muted-foreground hover:bg-accent/30'
+                                                    )}
+                                                >
+                                                    {isActive && (
+                                                        <motion.div
+                                                            layoutId="active-indicator"
+                                                            className="absolute left-0 w-1 h-6 bg-primary rounded-r-full"
+                                                            initial={{ opacity: 0 }}
+                                                            animate={{ opacity: 1 }}
+                                                            exit={{ opacity: 0 }}
+                                                        />
+                                                    )}
+
+                                                    <div className="flex items-center gap-4 overflow-hidden flex-1">
+                                                        <div className={cn("p-2 rounded-md transition-colors", isActive ? "bg-background shadow-sm" : "bg-muted/30")}>
+                                                            <Icon className={cn("h-5 w-5", item.type === 'task' && 'completed' in item && item.completed && "text-green-500")} />
+                                                        </div>
+                                                        <div className="flex flex-col overflow-hidden">
+                                                                <span className={cn("text-sm font-medium truncate transition-colors", isActive ? "text-foreground" : "")}>
+                                                                    {title}
+                                                                </span>
+                                                                {content && (
+                                                                    <span className="text-xs text-muted-foreground/70 truncate max-w-[400px]">{content}</span>
+                                                                )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {isActive && (
+                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-200">
+                                                            <span className="hidden sm:inline">Jump to</span>
+                                                            <ArrowRight className="h-3 w-3" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                             )
+                        })
                     ) : (
-                        <div className="text-center py-10 text-sm text-muted-foreground">
-                            <p>No results found for "{searchTerm}".</p>
+                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                            <Command className="h-10 w-10 mb-4 opacity-20" />
+                            <p className="text-lg font-medium">No results found</p>
+                            <p className="text-sm opacity-60">Try searching for something else</p>
                         </div>
                     )}
                 </div>
             </ScrollArea>
-             <div className="p-3 border-t text-center">
-                <p className="text-xs text-muted-foreground">
-                    Use <kbd className="font-mono bg-secondary text-muted-foreground p-1 rounded-sm">↑</kbd> <kbd className="font-mono bg-secondary text-muted-foreground p-1 rounded-sm">↓</kbd> to navigate, <kbd className="font-mono bg-secondary text-muted-foreground p-1 rounded-sm">Enter</kbd> to select.
-                </p>
+            
+            <div className="bg-muted/30 border-t border-white/5 px-4 py-2 flex items-center justify-between text-[10px] text-muted-foreground font-medium">
+                <div className="flex gap-4">
+                     <span className="flex items-center gap-1">
+                        <kbd className="bg-background/50 border border-white/10 rounded px-1 min-w-[16px] text-center">↑</kbd>
+                        <kbd className="bg-background/50 border border-white/10 rounded px-1 min-w-[16px] text-center">↓</kbd>
+                        <span>to navigate</span>
+                     </span>
+                     <span className="flex items-center gap-1">
+                        <kbd className="bg-background/50 border border-white/10 rounded px-1 min-w-[20px] text-center">↵</kbd>
+                        <span>to select</span>
+                     </span>
+                </div>
+                <div>
+                     <span className="flex items-center gap-1">
+                        <span className="opacity-70">Pro Tip:</span>
+                        <span>Type </span>
+                        <kbd className="bg-background/50 border border-white/10 rounded px-1">@</kbd>
+                        <span> to filter</span>
+                     </span>
+                </div>
             </div>
+
         </DialogContent>
       </Dialog>
     </>

@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 
 interface KpiCardProps {
   title: string;
-  value: string;
+  value: string | React.ReactNode;
   icon: LucideIcon;
   children?: React.ReactNode;
   className?: string;
+  valueClassName?: string;
 }
 
-export default function KpiCard({ title, value, icon: Icon, children, className }: KpiCardProps) {
+export default function KpiCard({ title, value, icon: Icon, children, className, valueClassName }: KpiCardProps) {
   return (
     <Card className={cn(
         "transition-shadow border border-border/50 shadow-sm",
@@ -23,7 +24,7 @@ export default function KpiCard({ title, value, icon: Icon, children, className 
         <Icon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className={cn("text-2xl font-bold", valueClassName)}>{value}</div>
         {children}
       </CardContent>
     </Card>

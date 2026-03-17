@@ -6,12 +6,18 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: process.env.NEXT_MANUAL_EXPORT ? 'export' : undefined,
+  async rewrites() {
+    return [
+      {
+        source: '/',
+        destination: '/dashboard',
+      },
+    ]
+  },
   reactStrictMode: false,
   typescript: {
     ignoreBuildErrors: true,
   },
-
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -30,10 +36,7 @@ const nextConfig = {
     ],
   },
   turbopack: {
-    // This allows the build to succeed with Turbopack even if webpack config is present
-  },
-  webpack: (config) => {
-    return config;
+    root: __dirname,
   },
 };
 

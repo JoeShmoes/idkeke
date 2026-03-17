@@ -1,88 +1,31 @@
-
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
-import { useApp } from './app-provider';
-import { allAchievements, type Achievement } from '@/lib/achievements';
-import { Progress } from '@/components/ui/progress';
+import { useState, useEffect } from 'react';
+import { useLevel } from '@/hooks/use-level';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import LevelUpAnimation from './level-up-animation';
 import { perks } from '@/app/(main)/perks';
-import { Building, ClipboardCheck, Infinity, Shield } from 'lucide-react';
+import { Building, ClipboardCheck, Infinity, Shield, Zap, Crown, Star, Medal, Trophy, Award } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
-const levelThresholds = [
-    0, 50, 125, 250, 500, 1000, 2000, 4000, 8000, 15000, 25000, 50000, 
-    75000, 100000, 130000, 165000, 205000, 250000, 300000, 355000, 415000,
-    480000, 550000, 625000, 705000, 800000, 900000, 1000000, 1150000, 1300000,
-    1500000, 1750000, 2000000, 2300000, 2600000, 2950000, 3300000, 3700000, 4100000, 4500000,
-    5000000, 5500000, 6000000, 6500000, 7000000, 7500000, 8000000, 8500000, 9000000, 9500000,
-    10000000, 10750000, 11500000, 12250000, 13000000, 13750000, 14500000, 15250000, 16000000,
-    17000000, 18000000, 19000000, 20000000, 21000000, 22000000, 23000000, 24000000, 25000000,
-    26500000, 28000000, 29500000, 31000000, 32500000, 34000000, 35500000, 37000000, 38500000,
-    40000000, 42000000, 44000000, 46000000, 48000000, 50000000, 52500000, 55000000, 57500000,
-    60000000, 63000000, 66000000, 69000000, 72000000, 75000000, 80000000, 85000000, 90000000,
-    95000000, 100000000
+const RANKS = [
+    { threshold: 1, title: 'Novice', icon: Star, color: 'text-zinc-500' },
+    { threshold: 5, title: 'Apprentice', icon: Zap, color: 'text-blue-500' },
+    { threshold: 10, title: 'Adept', icon: Shield, color: 'text-green-500' },
+    { threshold: 25, title: 'Expert', icon: Medal, color: 'text-purple-500' },
+    { threshold: 50, title: 'Master', icon: Trophy, color: 'text-orange-500' },
+    { threshold: 100, title: 'Legend', icon: Crown, color: 'text-yellow-500' },
 ];
 
 export default function LevelBar() {
-  const { tasks, clients, projects, accounts, notes, assets, learningResources, networkContacts } = useApp();
+  const { currentLevel, totalPoints, progressToNextLevel, pointsForNextLevel, xpInCurrentLevel, xpRequiredForNextLevel } = useLevel();
   const [previousLevel, setPreviousLevel] = useState(1);
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [unlockedPerks, setUnlockedPerks] = useState<typeof perks> ([]);
+  const [unlockedPerks, setUnlockedPerks] = useState<typeof perks>([]);
 
-  const { totalPoints, currentLevel, progressToNextLevel, pointsForNextLevel } = useMemo(() => {
-    let points = 0;
-    allAchievements.forEach(ach => {
-        let isUnlocked = false;
-        switch (ach.category) {
-            case 'tasks':
-                isUnlocked = tasks.filter(t => t.completed).length >= ach.threshold;
-                break;
-            case 'clients':
-                isUnlocked = clients.length >= ach.threshold;
-                break;
-            case 'projects':
-                isUnlocked = projects.filter(p => p.status === 'completed').length >= ach.threshold;
-                break;
-            case 'finance':
-                const netWorth = accounts.reduce((sum, acc) => acc.type === 'credit' ? sum - acc.balance : sum + acc.balance, 0);
-                isUnlocked = netWorth >= ach.threshold;
-                break;
-            case 'notes':
-                isUnlocked = notes.length >= ach.threshold;
-                break;
-            case 'assets':
-                const totalAssetValue = assets.reduce((sum, asset) => sum + asset.value, 0);
-                isUnlocked = totalAssetValue >= ach.threshold;
-                break;
-            case 'learning':
-                isUnlocked = learningResources.filter(r => r.status === 'completed').length >= ach.threshold;
-                break;
-            case 'networking':
-                isUnlocked = networkContacts.length >= ach.threshold;
-                break;
-        }
-        if (isUnlocked) {
-            points += ach.points;
-        }
-    });
-    
-    let level = 1;
-    while (level < levelThresholds.length && points >= levelThresholds[level]) {
-        level++;
-    }
-    
-    const currentLevelPoints = levelThresholds[level - 1] || 0;
-    const nextLevelPoints = levelThresholds[level] || Number.MAX_SAFE_INTEGER;
-    const progress = nextLevelPoints === Number.MAX_SAFE_INTEGER ? 100 : ((points - currentLevelPoints) / (nextLevelPoints - currentLevelPoints)) * 100;
-
-    return { 
-        totalPoints: points, 
-        currentLevel: level, 
-        progressToNextLevel: progress,
-        pointsForNextLevel: nextLevelPoints
-    };
-  }, [tasks, clients, projects, accounts, notes, assets, learningResources, networkContacts]);
+  const currentRank = [...RANKS].reverse().find(r => currentLevel >= r.threshold) || RANKS[0];
+  const RankIcon = currentRank.icon;
 
   useEffect(() => {
     if (currentLevel > previousLevel) {
@@ -97,25 +40,123 @@ export default function LevelBar() {
   return (
     <>
         <TooltipProvider>
-        <Tooltip>
+        <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
-            <div className="flex items-center gap-2 w-32">
-                <span className="text-sm font-bold">Lvl {currentLevel}</span>
-                <Progress value={progressToNextLevel} className="h-2 flex-1" />
-            </div>
+                <motion.div 
+                    className="flex items-center gap-2 bg-background/30 backdrop-blur-sm px-2 py-0.5 rounded-full border border-border/30 hover:bg-accent/50 transition-all cursor-pointer group relative overflow-hidden"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                >
+                    {/* Background Progress Fill (Subtle) */}
+                    <div 
+                        className="absolute inset-0 bg-primary/5 origin-left transition-transform duration-500 ease-out" 
+                        style={{ transform: `scaleX(${progressToNextLevel / 100})` }}
+                    />
+
+                    <div className="flex items-center gap-2 relative z-10">
+                        <div className={cn(
+                            "flex items-center justify-center h-5 w-5 rounded-full shadow-sm border border-border/50 bg-gradient-to-br from-background to-muted text-[10px] font-bold text-foreground",
+                            currentRank.color.replace('text-', 'border-').replace('500', '200')
+                        )}>
+                            {currentLevel}
+                        </div>
+                        
+                        <div className="flex flex-col gap-0.5">
+                            <div className="h-1 w-20 bg-muted/50 rounded-full overflow-hidden">
+                                <motion.div 
+                                    className={cn(
+                                        "h-full shadow-[0_0_10px_rgba(var(--primary),0.5)]",
+                                        "bg-gradient-to-r from-primary/80 to-primary" 
+                                    )}
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${progressToNextLevel}%` }}
+                                    transition={{ type: "spring", stiffness: 50, damping: 15 }}
+                                />
+                            </div>
+                        </div>
+
+                        <span className="text-[10px] font-medium text-muted-foreground tabular-nums relative z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 w-0 group-hover:w-auto overflow-hidden whitespace-nowrap">
+                            {Math.floor(progressToNextLevel)}%
+                        </span>
+                    </div>
+                </motion.div>
             </TooltipTrigger>
-            <TooltipContent>
-            <p>
-                {totalPoints.toLocaleString()} / 
-                {pointsForNextLevel === Number.MAX_SAFE_INTEGER ? '∞' : (pointsForNextLevel as number).toLocaleString()} XP to next level
-            </p>
+            <TooltipContent side="bottom" align="end" className="w-80 p-0 border-border/50 shadow-xl bg-popover/95 backdrop-blur-xl z-[100]">
+                <div className="p-4 space-y-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h4 className="font-bold text-sm flex items-center gap-2">
+                                <RankIcon className={cn("h-4 w-4", currentRank.color)} />
+                                {currentRank.title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">Level {currentLevel} • Keep growing to unlock perks</p>
+                        </div>
+                        <div className="text-2xl font-black text-primary/20">
+                            {currentLevel}
+                        </div>
+                    </div>
+
+                    {/* Progress Stats */}
+                    <div className="space-y-2 bg-muted/30 p-3 rounded-lg border border-border/50">
+                        <div className="flex justify-between text-xs font-medium">
+                            <span className="text-muted-foreground">Level XP</span>
+                            <span>{Math.floor(xpInCurrentLevel).toLocaleString()} / {xpRequiredForNextLevel.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-medium">
+                            <span className="text-muted-foreground">Total XP</span>
+                            <span>{Math.floor(totalPoints).toLocaleString()}</span>
+                        </div>
+                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden mt-2">
+                            <motion.div 
+                                className="h-full bg-primary"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${progressToNextLevel}%` }}
+                            />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground text-center pt-1">
+                            {Math.floor(xpRequiredForNextLevel - xpInCurrentLevel).toLocaleString()} XP needed for Level {currentLevel + 1}
+                        </p>
+                    </div>
+
+                    {/* Next Unlocks */}
+                    <div className="space-y-2">
+                        <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Up Next</h4>
+                        <div className="grid grid-cols-1 gap-2">
+                            {perks
+                                .filter(p => p.level > currentLevel)
+                                .slice(0, 2)
+                                .map((perk, i) => (
+                                    <div key={i} className="flex items-start gap-3 bg-background/50 p-2.5 rounded-lg border border-border/50 hover:border-primary/20 transition-colors">
+                                        <div className="p-1.5 bg-primary/10 rounded-md mt-0.5">
+                                            {perk.icon === 'infinity' && <Infinity className="h-3 w-3 text-primary" />}
+                                            {perk.icon === 'shield' && <Shield className="h-3 w-3 text-primary" />}
+                                            {perk.icon === 'building' && <Building className="h-3 w-3 text-primary" />}
+                                            {perk.icon === 'clipboard-check' && <ClipboardCheck className="h-3 w-3 text-primary" />}
+                                            {!['infinity', 'shield', 'building', 'clipboard-check'].includes(perk.icon) && <Zap className="h-3 w-3 text-primary" />}
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold">Level {perk.level}</span>
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground leading-snug mt-0.5">{perk.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                             {perks.filter(p => p.level > currentLevel).length === 0 && (
+                                <p className="text-xs text-muted-foreground text-center py-2">Max level reached!</p>
+                             )}
+                        </div>
+                    </div>
+                </div>
             </TooltipContent>
         </Tooltip>
         </TooltipProvider>
+
         <LevelUpAnimation 
-            isOpen={showLevelUp}
-            onClose={() => setShowLevelUp(false)}
-            newLevel={currentLevel}
+            open={showLevelUp} 
+            onOpenChange={setShowLevelUp}
+            level={currentLevel}
             unlockedPerks={unlockedPerks}
         />
     </>

@@ -7,16 +7,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
     Landmark, Notebook, UserPlus, ClipboardCheck, Bell, AlertTriangle, 
     Target, DollarSign, BookOpen, Network, Building, TrendingDown, 
-    Calendar, FileText, HeartPulse, Search, Award
+    Calendar, FileText, HeartPulse, Search, Award, X
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
+import { Button } from '../ui/button';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { formatDistanceToNow, isBefore, isToday, startOfToday, addDays, differenceInDays, isAfter } from 'date-fns';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../ui/resizable';
 
 interface ActivityItem {
     id: string;
-    type: 'Task' | 'Project' | 'Client' | 'Transaction' | 'Note' | 'Notification' | 'Goal' | 'Account' | 'Learning' | 'Network' | 'Asset' | 'Research';
+    type: 'Task' | 'Project' | 'Client' | 'Transaction' | 'Note' | 'Note' | 'Notification' | 'Goal' | 'Account' | 'Learning' | 'Network' | 'Asset' | 'Research';
     icon: React.ElementType;
     title: string;
     description: string;
@@ -26,12 +27,12 @@ interface ActivityItem {
 
 const Section = ({ title, children }: { title: string, children: React.ReactNode }) => {
     return (
-        <div className="flex flex-col h-full">
-            <div className="flex h-16 items-center px-4 border-b shrink-0 bg-background">
-                <h3 className="text-xl font-semibold">{title}</h3>
+        <div className="flex flex-col h-full min-w-0 overflow-hidden">
+            <div className="flex h-16 items-center px-3 border-b shrink-0 bg-background">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
             </div>
             <ScrollArea className="flex-1">
-                <div className="p-4 space-y-4">
+                <div className="p-3 space-y-3">
                     {children}
                 </div>
             </ScrollArea>
@@ -41,8 +42,8 @@ const Section = ({ title, children }: { title: string, children: React.ReactNode
 
 export default function RightSidebar() {
     const { 
-        projects, clients, transactions, notes, networkContacts, appSettings, tasks,
-        accounts, goals, learningResources, researchSessions, assets
+        projects, clients, transactions, networkContacts, appSettings, tasks,
+        accounts, goals, learningResources, researchSessions, assets, toggleRightSidebar
     } = useApp();
 
     const activityFeed: ActivityItem[] = useMemo(() => {
@@ -71,19 +72,12 @@ export default function RightSidebar() {
             description: t.description,
             timestamp: t.date
         })) : [];
-        
-        const noteActivities = Array.isArray(notes) ? notes.map(n => ({
-            id: `note-${n.id}`, type: 'Note' as const, icon: Notebook,
-            title: `Note created: ${n.title}`,
-            description: n.content.substring(0, 40) + '...',
-            timestamp: n.createdAt
-        })) : [];
 
-        return [...projectActivities, ...clientActivities, ...transactionActivities, ...noteActivities]
+        return [...projectActivities, ...clientActivities, ...transactionActivities]
                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
                .slice(0, 20);
 
-    }, [projects, clients, transactions, notes]);
+    }, [projects, clients, transactions]);
 
     const notifications: ActivityItem[] = useMemo(() => {
         const today = startOfToday();
@@ -329,7 +323,7 @@ export default function RightSidebar() {
                     <item.icon className="h-4 w-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{item.title}</p>
+                    <p className="text-sm font-medium truncate">{item.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{item.description}</p>
                     <p className="text-xs text-muted-foreground/80 mt-0.5">
                         {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
@@ -392,8 +386,8 @@ export default function RightSidebar() {
                     <div className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-full bg-secondary">
                         <item.icon className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="flex-1">
-                        <p className="text-sm font-medium">{item.title}</p>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.title}</p>
                         <p className="text-xs text-muted-foreground truncate">{item.description}</p>
                         <p className="text-xs text-muted-foreground/80">{formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}</p>
                     </div>
@@ -410,12 +404,12 @@ export default function RightSidebar() {
         <>
             {networkContacts.length > 0 ? networkContacts.map(contact => (
                 <div key={contact.id} className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
+                    <Avatar className="h-9 w-9 flex-shrink-0">
                         <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
                     </Avatar>
-                    <div>
-                        <p className="text-sm font-semibold">{contact.name}</p>
-                        <p className="text-xs text-muted-foreground">{contact.role}</p>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{contact.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{contact.role}</p>
                     </div>
                 </div>
             )) : (
@@ -443,9 +437,17 @@ export default function RightSidebar() {
 
 
     return (
-        <div className="flex flex-col h-full border-l bg-background">
-            <div className="h-16 flex items-center px-4 border-b flex-shrink-0">
-                <h2 className="text-lg font-semibold">Activity & Updates</h2>
+        <div className="flex flex-col h-full border-l bg-background overflow-hidden">
+            <div className="h-16 flex items-center justify-between px-4 border-b flex-shrink-0">
+                <h2 className="text-base font-semibold">Activity & Updates</h2>
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="md:hidden h-8 w-8" 
+                    onClick={toggleRightSidebar}
+                >
+                    <X className="h-4 w-4" />
+                </Button>
             </div>
             <ResizablePanelGroup direction="vertical" className="flex-1 overflow-hidden">
                 <ResizablePanel defaultSize={33}>

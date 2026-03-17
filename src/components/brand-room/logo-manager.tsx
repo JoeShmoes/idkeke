@@ -8,8 +8,14 @@ import Image from 'next/image';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { PlusCircle, Trash2, UploadCloud, FileArchive, Image as ImageIcon } from 'lucide-react';
+import { PlusCircle, Trash2, UploadCloud, FileArchive, Image as ImageIcon, Copy } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
     Dialog,
     DialogContent,
@@ -182,29 +188,47 @@ export default function LogoManager({ profile, onUpdate }: LogoManagerProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {profile.logos.map(logo => (
-            <Card key={logo.id} className="group relative overflow-hidden transition-shadow hover:shadow-lg">
-                <CardContent className="p-4 flex flex-col items-center justify-center gap-2 aspect-square bg-muted/30">
-                    <Image 
-                        src={logo.url}
-                        alt={logo.name}
-                        width={100}
-                        height={100}
-                        className="object-contain max-h-24"
-                        data-ai-hint="logo"
-                    />
-                </CardContent>
-                 <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center p-2 text-center opacity-0 group-hover:opacity-100 transition-opacity">
-                     <p className="text-sm font-medium text-white mb-2 truncate">{logo.name}</p>
-                    <Button 
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleRemoveLogo(logo.id)}
-                    >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                    </Button>
-                </div>
-            </Card>
+            <ContextMenu key={logo.id}>
+                <ContextMenuTrigger>
+                    <Card className="group relative overflow-hidden transition-shadow hover:shadow-lg h-full">
+                        <CardContent className="p-4 flex flex-col items-center justify-center gap-2 aspect-square bg-muted/30">
+                            <Image 
+                                src={logo.url}
+                                alt={logo.name}
+                                width={100}
+                                height={100}
+                                className="object-contain max-h-24"
+                                data-ai-hint="logo"
+                            />
+                        </CardContent>
+                         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center p-2 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                             <p className="text-sm font-medium text-white mb-2 truncate">{logo.name}</p>
+                            <Button 
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleRemoveLogo(logo.id)}
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                            </Button>
+                        </div>
+                    </Card>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto">
+                    <ContextMenuItem onClick={() => window.open(logo.url, '_blank')}>
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Open Image in New Tab
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => copyToClipboard(logo.url)}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy Image Link
+                    </ContextMenuItem>
+                    <ContextMenuItem className="text-destructive" onClick={() => handleRemoveLogo(logo.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Logo
+                    </ContextMenuItem>
+                </ContextMenuContent>
+            </ContextMenu>
         ))}
         <button 
             onClick={() => setIsAddDialogOpen(true)}

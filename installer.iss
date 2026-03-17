@@ -1,7 +1,7 @@
 #define MyAppName "Nexaris Module"
 #define MyAppVersion "0.1.0"
 #define MyAppPublisher "Nexaris"
-#define MyAppURL "https://nexaris-media-web-app.vercel.app"
+#define MyAppURL "https://app.nexarismedia.online"
 #define MyAppExeName "NexarisModule.exe"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".myp"
