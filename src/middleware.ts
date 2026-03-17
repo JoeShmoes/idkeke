@@ -5,8 +5,8 @@ export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   // Only run Supabase middleware if env vars are present
-  const supabaseUrl = process.env.supabase_url;
-  const supabaseKey = process.env.supabase_anon;
+  const supabaseUrl = process.env.supabase_url || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.supabase_anon || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (supabaseUrl && supabaseKey) {
     const supabase = createServerClient(
