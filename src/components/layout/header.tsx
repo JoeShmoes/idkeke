@@ -16,8 +16,9 @@ import { useHotkeys } from '@/hooks/use-hotkeys-safe';
 import Link from 'next/link';
 import { RoomStorage } from '@/components/collaboration/storage';
 import { availableRooms } from '@/lib/constants';
-import { 
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator 
+import { cn } from '@/lib/utils';
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 
 const pageInfo: { [key: string]: { title: string; description: string; } } = {
@@ -31,7 +32,6 @@ const pageInfo: { [key: string]: { title: string; description: string; } } = {
     '/clients': { title: 'Clients', description: "Manage your client relationships." },
     '/budgeting': { title: 'Budgeting', description: 'Monitor and manage your financial health.' },
     '/asset-tracker': { title: 'Assets', description: "Track your physical, digital, and creative assets." },
-    '/brand-room': { title: 'Brand Room', description: "Manage your brand's identity and assets." },
     '/file-vault': { title: 'File Vault', description: "A secure place for your documents and files." },
     '/vilefault': { title: 'VileFault', description: "A secure place for your documents and files." },
     '/sheets': { title: 'Spreadsheets', description: 'Advanced spreadsheet and data management.' },
@@ -62,7 +62,7 @@ export function Header() {
     const [excalidrawSave, setExcalidrawSave] = useState<string>('idle');
 
     useEffect(() => {
-        if (!pathname.startsWith('/collaboration/')) return;
+        if (!pathname?.startsWith('/collaboration/')) return;
         const liveHandler = (e: any) => setExcalidrawLive(e.detail);
         const saveHandler = (e: any) => setExcalidrawSave(e.detail);
         window.addEventListener('excalidraw-live-status', liveHandler);
@@ -93,18 +93,18 @@ export function Header() {
     }, [pathname]);
 
     const hideRightSidebarRoutes = ['/file-vault', '/communications-secure-briefing-room', '/research'];
-    const shouldShowRightSidebar = appSettings.rightSidebar.isOpen && !hideRightSidebarRoutes.some(route => pathname.startsWith(route));
+    const shouldShowRightSidebar = appSettings.rightSidebar.isOpen && !hideRightSidebarRoutes.some(route => pathname?.startsWith(route));
 
-    let { title, description } = pageInfo[pathname] || { title: 'Dashboard', description: "A high-level overview of all your modules." };
+    let { title, description } = pageInfo[pathname || '/dashboard'] || { title: 'Dashboard', description: "A high-level overview of all your modules." };
 
     // Dynamic Title Overrides
-    if (pathname.startsWith('/collaboration/') && pathname !== '/collaboration') {
+    if (pathname?.startsWith('/collaboration/') && pathname !== '/collaboration') {
         title = dynamicTitle || 'Canvas';
         description = "Collaborative whiteboard session";
     }
 
     useEffect(() => {
-        if (pathname.startsWith('/collaboration/') && pathname !== '/collaboration') {
+        if (pathname?.startsWith('/collaboration/') && pathname !== '/collaboration') {
             const roomId = pathname.split('/').pop();
             if (roomId) {
                 // Poll for room name in case it's being created or loaded
@@ -122,7 +122,7 @@ export function Header() {
         }
     }, [pathname]);
 
-    const aiMessageCount = chats.reduce((acc, chat) => acc + chat.messages.length, 0);
+    const aiMessageCount = Object.values(chats).reduce((acc, chat) => acc + (chat.messages?.length || 0), 0);
 
     useHotkeys(appSettings.shortcuts.toggleSidebar.keys.join('+'), (e) => { if (e) e.preventDefault(); toggleSidebar() }, { enableOnFormTags: false });
 
@@ -132,7 +132,7 @@ export function Header() {
         const currentIndex = cycle.indexOf(currentTheme);
         const nextIndex = (currentIndex + 1) % cycle.length;
         const nextTheme = cycle[nextIndex];
-        setAppSettings(prev => ({...prev, theme: nextTheme as Theme}));
+        setAppSettings(prev => ({ ...prev, theme: nextTheme as Theme }));
     }
 
     const ThemeIcon = appSettings.theme.includes('dark') || appSettings.theme.includes('matrix') ? Moon : Sun;
@@ -142,7 +142,7 @@ export function Header() {
         try {
             const hide = localStorage.getItem('donation_hide_forever') === 'true';
             if (hide) return;
-        } catch {}
+        } catch { }
         let cancelled = false;
         const schedule = () => {
             if (cancelled) return;
@@ -150,7 +150,7 @@ export function Header() {
             const t = setTimeout(() => {
                 if (cancelled) return;
                 setDonationOpen(true);
-                try { localStorage.setItem('donation_last_shown_at', String(Date.now())); } catch {}
+                try { localStorage.setItem('donation_last_shown_at', String(Date.now())); } catch { }
                 schedule();
             }, minutes * 60 * 1000);
             return t;
@@ -166,146 +166,175 @@ export function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 sm:px-6 flex-shrink-0">
-            <SidebarTrigger className="md:hidden" asChild>
-                <Button variant="ghost" size="icon">
-                    <PanelLeft />
+            <header className={cn(
+                "sticky top-0 z-10 flex h-16 items-center border-b bg-background px-4 sm:px-6 flex-shrink-0 transition-all",
+                state === 'expanded' && appSettings.rightSidebar.isOpen ? "gap-1 sm:gap-2" : "gap-4"
+            )}>
+                <SidebarTrigger className="md:hidden" asChild>
+                    <Button variant="ghost" size="icon">
+                        <PanelLeft />
+                    </Button>
+                </SidebarTrigger>
+                <Button variant="ghost" size="icon" className="hidden md:flex" onClick={toggleSidebar} title="Collapse Sidebar">
+                    {state === 'expanded' ? <PanelLeftClose /> : <PanelRight />}
                 </Button>
-            </SidebarTrigger>
-            <Button variant="ghost" size="icon" className="hidden md:flex" onClick={toggleSidebar} title="Collapse Sidebar">
-                {state === 'expanded' ? <PanelLeftClose /> : <PanelRight />}
-            </Button>
 
-            <div className="flex-1 min-w-0 pt-0">
-                 <div className="flex flex-col items-start justify-center">
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-sm sm:text-lg font-bold text-foreground truncate leading-none mb-0.5">{title}</h1>
-                        {pathname === '/mail' && mailConnected !== null && (
-                            mailConnected ? (
-                                <CheckCircle2 className="w-4 h-4 text-green-500 mb-0.5" title="Mail server connected" />
-                            ) : (
-                                <XCircle className="w-4 h-4 text-red-500 mb-0.5" title="Mail server disconnected" />
-                            )
-                        )}
-                        {pathname.startsWith('/collaboration/') && pathname !== '/collaboration' && (
-                            <div className="flex items-center gap-2 mb-0.5">
-                                <div className={`h-2 w-2 rounded-full ${excalidrawLive ? 'bg-green-500' : 'bg-red-400'}`} title={excalidrawLive ? "Live Sync Active" : "Offline / Local Mode"} />
-                                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mr-1">
-                                    {excalidrawLive ? 'Live' : 'Offline'}
-                                </span>
-                                {excalidrawSave === 'saving' && (
-                                    <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-sm">
-                                        <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-                                        <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Saving...</span>
-                                    </div>
-                                )}
-                                {excalidrawSave === 'saved' && (
-                                    <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-sm">
-                                        <CheckCircle2 className="w-3 h-3 text-green-500" />
-                                        <span className="text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline">Saved</span>
-                                    </div>
-                                )}
-                                {excalidrawSave === 'error' && (
-                                    <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-sm">
-                                        <XCircle className="w-3 h-3 text-destructive" />
-                                        <span className="text-[10px] sm:text-xs font-medium text-destructive hidden sm:inline">Save Failed</span>
+                <div className={cn(
+                    "flex-1 min-w-0 pt-0",
+                    state === 'expanded' && appSettings.rightSidebar.isOpen && "max-w-[40px] sm:max-w-none"
+                )}>
+                        <div className="flex flex-col items-start justify-center h-10 overflow-hidden">
+                            <div className="flex items-center gap-2">
+                                <h1 className={cn(
+                                    "font-bold text-foreground truncate leading-none mb-0.5 transition-all",
+                                    state === 'expanded' && appSettings.rightSidebar.isOpen ? "text-[10px] sm:text-lg" : "text-sm sm:text-lg"
+                                )}>{title}</h1>
+                                {pathname === '/mail' && mailConnected !== null && (
+                                mailConnected ? (
+                                    <span title="Mail server connected"><CheckCircle2 className="w-4 h-4 text-green-500 mb-0.5" /></span>
+                                ) : (
+                                    <span title="Mail server disconnected"><XCircle className="w-4 h-4 text-red-500 mb-0.5" /></span>
+                                )
+                            )}
+                            {pathname?.startsWith('/collaboration/') && pathname !== '/collaboration' && (
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <div className={`h-2 w-2 rounded-full ${excalidrawLive ? 'bg-green-500' : 'bg-red-400'}`} title={excalidrawLive ? "Live Sync Active" : "Offline / Local Mode"} />
+                                        <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mr-1">
+                                            {excalidrawLive ? 'Live' : 'Offline'}
+                                        </span>
+                                        {excalidrawSave === 'saving' && (
+                                            <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-sm">
+                                                <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                                                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Saving...</span>
+                                            </div>
+                                        )}
+                                        {excalidrawSave === 'saved' && (
+                                            <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-sm">
+                                                <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline">Saved</span>
+                                            </div>
+                                        )}
+                                        {excalidrawSave === 'error' && (
+                                            <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-sm">
+                                                <XCircle className="w-3 h-3 text-destructive" />
+                                                <span className="text-[10px] sm:text-xs font-medium text-destructive hidden sm:inline">Save Failed</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
-                        )}
-                    </div>
-                    {(!shouldShowRightSidebar || state !== 'expanded') && (
-                        <p className="text-[10px] sm:text-xs text-muted-foreground truncate leading-none pb-2">{description}</p>
-                    )}
+                            {(!appSettings.rightSidebar.isOpen || state !== 'expanded') && (
+                                <p className="text-[10px] sm:text-xs text-muted-foreground truncate leading-none h-4 flex items-center">{description}</p>
+                            )}
+                        </div>
                 </div>
-            </div>
-            <div className="flex items-center gap-2">
-                {pathname === '/ai-room' && (
-                  <div className="flex items-center gap-4 mr-2 border-r pr-4 border-border/40">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="gap-2 h-8">
-                            <Brain className="h-4 w-4" />
-                            <span className="hidden sm:inline-block max-w-[100px] truncate text-left">
-                                {selectedRoom ? availableRooms.find(r => r.id === selectedRoom)?.name : 'All Rooms'}
-                            </span>
-                            <ChevronDown className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 max-h-[calc(100vh-100px)] overflow-y-auto">
-                          <DropdownMenuItem onClick={() => setSelectedRoom(null)}>
-                            <Brain className="h-4 w-4 mr-2" />
-                            All Rooms
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {availableRooms.map((room) => (
-                            <DropdownMenuItem
-                              key={room.id}
-                              onClick={() => setSelectedRoom(room.id)}
-                              className="flex-col items-start"
-                            >
-                              <div className="font-medium">{room.name}</div>
-                              <div className="text-xs text-muted-foreground">{room.description}</div>
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                <div className={cn(
+                    "flex items-center transition-all",
+                    state === 'expanded' && appSettings.rightSidebar.isOpen ? "gap-1" : "gap-2"
+                )}>
+                    {pathname === '/ai-room' && (
+                        <div className={cn(
+                            "flex items-center gap-4 mr-2 border-r pr-4 border-border/40",
+                            state === 'expanded' && appSettings.rightSidebar.isOpen && "hidden"
+                        )}>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-2 h-8">
+                                        <Brain className="h-4 w-4" />
+                                        <span className="hidden sm:inline-block max-w-[100px] truncate text-left">
+                                            {selectedRoom ? availableRooms.find(r => r.id === selectedRoom)?.name : 'All Rooms'}
+                                        </span>
+                                        <ChevronDown className="h-3 w-3" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56 max-h-[calc(100vh-100px)] overflow-y-auto">
+                                    <DropdownMenuItem onClick={() => setSelectedRoom(null)}>
+                                        <Brain className="h-4 w-4 mr-2" />
+                                        All Rooms
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    {availableRooms.map((room) => (
+                                        <DropdownMenuItem
+                                            key={room.id}
+                                            onClick={() => setSelectedRoom(room.id)}
+                                            className="flex-col items-start"
+                                        >
+                                            <div className="font-medium">{room.name}</div>
+                                            <div className="text-xs text-muted-foreground">{room.description}</div>
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
 
-                      <div className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">
-                        {aiMessageCount} msgs
-                      </div>
-                  </div>
-                )}
-                {pathname === '/mail' && (
-                  <div className="flex items-center gap-1 mr-2 border-r pr-3 border-border/40">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.location.reload()} title="Refresh">
-                          <RefreshCw className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" asChild title="Open in New Tab">
-                          <a href="http://localhost:3001" target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                      </Button>
-                  </div>
-                )}
-                <div className="w-full max-w-[80px] min-[400px]:max-w-[120px] sm:max-w-[200px]">
-                    <SearchPalette />
+                            <div className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">
+                                {aiMessageCount} msgs
+                            </div>
+                        </div>
+                    )}
+                    {pathname === '/mail' && (
+                        <div className="flex items-center gap-1 mr-2 border-r pr-3 border-border/40">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.location.reload()} title="Refresh">
+                                <RefreshCw className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" asChild title="Open in New Tab">
+                                <a href="http://localhost:3001" target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                            </Button>
+                        </div>
+                    )}
+                    <div className={cn(
+                        "w-full transition-all duration-300",
+                        state === 'expanded' && appSettings.rightSidebar.isOpen 
+                            ? "max-w-[40px] sm:max-w-[60px]" 
+                            : "max-w-[80px] min-[400px]:max-w-[120px] sm:max-w-[200px]"
+                    )}>
+                        <SearchPalette compact={state === 'expanded' && appSettings.rightSidebar.isOpen} />
+                    </div>
+                    <div className="hidden sm:block">
+                        <LevelBar compact={state === 'expanded' && appSettings.rightSidebar.isOpen} />
+                    </div>
+                    <div className={cn(
+                        "hidden md:block transition-all",
+                        state === 'expanded' && appSettings.rightSidebar.isOpen && "hidden lg:hidden xl:hidden"
+                    )}>
+                        <Clock />
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleThemeCycle}
+                        title="Cycle Theme"
+                        className={cn(
+                            "hidden sm:flex transition-all",
+                            state === 'expanded' && appSettings.rightSidebar.isOpen ? "hidden lg:hidden" : "sm:flex"
+                        )}
+                    >
+                        <ThemeIcon />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsSettingsOpen(true)}
+                        title="Settings"
+                        className={cn(
+                            "hidden sm:flex transition-all",
+                            state === 'expanded' && appSettings.rightSidebar.isOpen ? "hidden lg:hidden" : "sm:flex"
+                        )}
+                    >
+                        <Settings />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={toggleRightSidebar}
+                        title={appSettings.rightSidebar.isOpen ? "Hide Activity Panel" : "Show Activity Panel"}
+                    >
+                        {appSettings.rightSidebar.isOpen ? <PanelRightClose /> : <PanelRightOpen />}
+                    </Button>
                 </div>
-                <div className="hidden sm:block">
-                    <LevelBar />
-                </div>
-                <div className="hidden md:block">
-                    <Clock />
-                </div>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={handleThemeCycle}
-                    title="Cycle Theme"
-                    className="hidden sm:flex"
-                >
-                    <ThemeIcon />
-                </Button>
-                 <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setIsSettingsOpen(true)}
-                    title="Settings"
-                    className="hidden sm:flex"
-                >
-                    <Settings />
-                </Button>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={toggleRightSidebar}
-                    title={appSettings.rightSidebar.isOpen ? "Hide Activity Panel" : "Show Activity Panel"}
-                >
-                    {appSettings.rightSidebar.isOpen ? <PanelRightClose /> : <PanelRightOpen />}
-                </Button>
-            </div>
-        </header>
-        <DonationDialog open={donationOpen} onOpenChange={setDonationOpen} />
+            </header>
+            <DonationDialog open={donationOpen} onOpenChange={setDonationOpen} />
         </>
     );
 }

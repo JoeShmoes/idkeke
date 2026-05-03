@@ -4,7 +4,7 @@ import {
     Home, MessageSquareWarning, ListTodo, TrendingUp, Briefcase, KanbanSquare, 
     Users, Microscope, Notebook, Truck, Palette, File, Cpu, Wallet, Building, 
     User, Activity, GraduationCap, Network, Bot, GitBranch, PenSquare, Presentation, FileText, FileSpreadsheet, PieChart,
-    Archive, Wrench, Lock, Rocket, CalendarDays, Mail
+    Archive, Wrench, Lock, Rocket, CalendarDays, Mail, PenLine
 } from 'lucide-react';
 
 export const iconMap: { [key: string]: React.ElementType } = {
@@ -45,7 +45,8 @@ export const iconMap: { [key: string]: React.ElementType } = {
     Wrench,
     Lock,
     Rocket,
-    CalendarDays
+    CalendarDays,
+    PenLine
 };
 
 export type IconName = keyof typeof iconMap;
@@ -63,7 +64,7 @@ export const allNavItems: NavGroup[] = [
       { href: '/dashboard', label: 'Dashboard', icon: 'Home' },
       { href: '/tasks', label: 'Tasks', icon: 'ListTodo' },
       { href: '/collaboration', label: 'Collaboration', icon: 'Presentation' },
-      { href: '/calendar', label: 'Calendar', icon: 'CalendarDays' },
+
       { href: '/sheets', label: 'Spreadsheets', icon: 'FileSpreadsheet' },
     ],
   },
@@ -80,14 +81,9 @@ export const allNavItems: NavGroup[] = [
     label: 'Research & Knowledge',
     items: [
       { href: '/research', label: 'Research', icon: 'Microscope' },
+      { href: '/journal', label: 'Journal', icon: 'PenLine' },
       { href: '/notes', label: 'Notes', icon: 'Notebook' },
     ],
-  },
-  {
-    label: 'Brand',
-    items: [
-        { href: '/brand-room', label: 'Brand Room', icon: 'Palette' },
-    ]
   },
   {
     label: 'Finance & Assets',

@@ -89,33 +89,38 @@ async function fetchWebResults(query: string): Promise<string> {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    let messages = body.messages;
+    let messages = body.messages || [];
     const shouldStream = Boolean(body.stream);
     const maxTokens =
       typeof body.max_tokens === 'number' && body.max_tokens > 0
         ? Math.min(body.max_tokens, 4000)
         : 1024;
 
-    const apiKey = process.env.MISTRAL_API_KEY;
-    const model = process.env.MISTRAL_MODEL || 'mistral-small-latest';
+    // Determine Provider & API Key
+    // Prefer Groq (labeled as GROCK in env) if available, it matches the "GPT-OSS" performance
+    const groqKey = process.env.GROCK_GPT_API_KEY;
+    const mistralKey = process.env.MISTRAL_API_KEY;
+    
+    let apiKey = groqKey || mistralKey;
+    let provider: 'groq' | 'mistral' = groqKey ? 'groq' : 'mistral';
+    let model = groqKey 
+      ? (process.env.GROCK_MODEL || 'llama-3.3-70b-versatile') 
+      : (process.env.MISTRAL_MODEL || 'mistral-small-latest');
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'MISTRAL_API_KEY is not defined' },
+        { error: 'No AI API Key defined in environment (.env)' },
         { status: 500 }
       );
     }
 
-    // Check if the last user message needs web search
+    // --- SEARCH INTEGRATION ---
     const lastMessage = messages?.[messages.length - 1];
     if (lastMessage?.role === 'user' && needsWebSearch(lastMessage.content)) {
       try {
         const searchResults = await fetchWebResults(lastMessage.content);
         if (searchResults) {
-          console.log('[AI Chat] Web search triggered:', lastMessage.content);
-          console.log('[AI Chat] Search results:', searchResults);
-          // Inject search results as a separate assistant message so the model
-          // clearly sees the search results and can cite the exact links.
+          console.log(`[AI Chat] Web search triggered for ${provider}:`, lastMessage.content);
           messages = [
             ...messages.slice(0, -1),
             {
@@ -126,12 +131,30 @@ export async function POST(req: Request) {
           ];
         }
       } catch (e) {
-        // If search fails, continue without it
         console.error('[AI Chat] Failed to fetch search results:', e);
       }
     }
 
-    const mistralResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    // --- SYSTEM PROMPT CONSOLIDATION ---
+    // Avoid double system prompts. If the incoming messages already have a system prompt,
+    // we merge our instructions into it or prepend if missing.
+    const alfredInstructions = `You are Alfred, a state-of-the-art AI assistant for the Nexaris platform. You help users manage their business, strategy, research, and personal life. Be concise, professional, and insightful.`;
+    const searchInstructions = `You have access to real-time search results. Use them to provide accurate, cited information. At the end, list URLs in a **Sources:** section and use inline citations [1], [2].`;
+    
+    const combinedSystemPrompt = `${alfredInstructions}\n\n${searchInstructions}`;
+
+    // Filter out existing system prompts to replace with our consolidated one at the top
+    const cleanedMessages = messages.filter((m: any) => m.role !== 'system');
+    const finalMessages = [
+      { role: 'system', content: combinedSystemPrompt },
+      ...cleanedMessages
+    ];
+
+    const endpoint = provider === 'groq' 
+      ? 'https://api.groq.com/openai/v1/chat/completions'
+      : 'https://api.mistral.ai/v1/chat/completions';
+
+    const aiResponse = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -139,69 +162,80 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         model,
-        messages: [
-          {
-            role: 'system',
-            content: `You have access to real-time web search results. When answering, YOU MUST ONLY use information from the search results provided in the conversation (the assistant message titled "Search results"). Do NOT invent, assume, or attribute facts to any source not present in those results. At the end of your response, include a **Sources:** section listing each exact URL you relied on, and use inline numeric citations in the body like [1], [2] that reference that Sources list. If the search results do not contain verifiable information for the user's request, explicitly say you could not verify and avoid fabricating answers.`
-          },
-          ...messages
-        ],
+        messages: finalMessages,
         max_tokens: maxTokens,
+        stream: shouldStream
       }),
     });
 
-    if (!mistralResponse.ok) {
-      const status = mistralResponse.status;
-      let details = '';
-      try {
-        const payload = await mistralResponse.json();
-        details = JSON.stringify(payload);
-      } catch {
-        details = await mistralResponse.text();
-      }
+    if (!aiResponse.ok) {
+      const errorData = await aiResponse.json().catch(() => ({}));
       return NextResponse.json(
-        {
-          error: 'Mistral API error',
-          details,
-          status,
+        { 
+          error: `${provider === 'groq' ? 'Groq' : 'Mistral'} API error`, 
+          details: errorData.error?.message || JSON.stringify(errorData),
+          status: aiResponse.status 
         },
-        { status }
+        { status: aiResponse.status }
       );
     }
 
-    const completion = await mistralResponse.json();
-    const content =
-      completion.choices?.[0]?.message?.content ||
-      completion.choices?.[0]?.delta?.content ||
-      '';
-    const finishReason = completion.choices?.[0]?.finish_reason || 'stop';
-
-    if (shouldStream) {
+    // Handle Streaming
+    if (shouldStream && aiResponse.body) {
       const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(encoder.encode(String(content || '').trim()));
-          controller.close();
-        },
+      const decoder = new TextDecoder();
+      
+      const transformStream = new TransformStream({
+        transform(chunk, controller) {
+          const text = decoder.decode(chunk);
+          const lines = text.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') continue;
+              
+              try {
+                const parsed = JSON.parse(data);
+                const delta = parsed.choices?.[0]?.delta?.content || '';
+                if (delta) {
+                  controller.enqueue(encoder.encode(delta));
+                }
+              } catch (e) {
+                // Ignore parsing errors for partial/malformed SSE lines
+              }
+            }
+          }
+        }
       });
 
-      return new Response(stream, {
+      return new Response(aiResponse.body.pipeThrough(transformStream), {
         headers: {
           'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-Used-Provider': provider,
           'X-Used-Model': model,
-          'X-Finish-Reason': finishReason,
         },
       });
     }
+
+    // Handle Non-Streaming
+    const completion = await aiResponse.json();
+    const content = completion.choices?.[0]?.message?.content || '';
 
     return NextResponse.json({
       content: String(content || '').trim(),
       model,
+      provider
     });
+
   } catch (error) {
+    console.error('[AI Chat] Internal Error:', error);
     return NextResponse.json(
       { error: 'Internal Server Error', details: String(error) },
       { status: 500 }
     );
   }
 }
+

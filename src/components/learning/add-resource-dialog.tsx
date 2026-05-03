@@ -68,13 +68,17 @@ export default function AddResourceDialog({ isOpen, onOpenChange, onSave, resour
     e.preventDefault();
     setIsDragging(false);
     
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            setIcon(event.target?.result as string);
-        };
-        reader.readAsDataURL(file);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+        // Even if multiple are dropped, we take the last one as the intended icon
+        const file = files[files.length - 1];
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setIcon(event.target?.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
     }
   };
 
@@ -156,17 +160,22 @@ export default function AddResourceDialog({ isOpen, onOpenChange, onSave, resour
                     <input 
                         id="icon-upload" 
                         type="file" 
+                        multiple
                         accept="image/*" 
                         className="hidden" 
                         onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
+                            const files = e.target.files;
+                            if (files && files.length > 0) {
+                                // Take the last selected file as the icon
+                                const file = files[files.length - 1];
                                 const reader = new FileReader();
                                 reader.onload = (event) => {
                                     setIcon(event.target?.result as string);
                                 };
                                 reader.readAsDataURL(file);
                             }
+                            // Reset input
+                            e.target.value = '';
                         }} 
                     />
                 </div>

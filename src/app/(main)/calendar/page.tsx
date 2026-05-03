@@ -16,6 +16,7 @@ import KeyboardShortcuts from '@/components/calendar/KeyboardShortcuts';
 import CalendarAccountModal from '@/components/calendar/CalendarAccountModal';
 import { useSafeLocalStorage } from '@/hooks/use-safe-local-storage';
 import { useApp } from '@/components/layout/app-provider';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -50,7 +51,22 @@ const getGapi = () => {
   });
 };
 
+
 export default function CalendarPage() {
+  const router = useRouter();
+  
+  useEffect(() => {
+    router.replace('/dashboard');
+  }, [router]);
+
+  return (
+    <div className="h-full flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground font-medium">Redirecting...</div>
+    </div>
+  );
+}
+
+function OldCalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useSafeLocalStorage<'day' | 'week' | 'month'>('calendar-last-view', 'month');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);

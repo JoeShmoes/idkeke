@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useApp, KEYS, getScopedKey } from './layout/app-provider';
+import { useApp } from './layout/app-provider';
+import { KEYS, getScopedKey } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -9,7 +10,6 @@ import { allNavItems } from '@/lib/nav-items';
 
 export function SyncManager() {
   const { 
-    user, 
     chats, setChats,
     sheets, setSheets,
     notes, setNotes,
@@ -41,6 +41,7 @@ export function SyncManager() {
     growthHistory, setGrowthHistory,
     welcomePlayed, setWelcomePlayed,
     rooms, setRooms,
+    journals, setJournals,
     isDataLoaded
   } = useApp();
   
@@ -83,6 +84,7 @@ export function SyncManager() {
     { key: getScopedKey(KEYS.GROWTH_HISTORY) || KEYS.GROWTH_HISTORY, val: growthHistory, set: setGrowthHistory },
     { key: getScopedKey(KEYS.WELCOME) || KEYS.WELCOME, val: welcomePlayed, set: setWelcomePlayed },
     { key: getScopedKey(KEYS.ROOMS) || KEYS.ROOMS, val: rooms, set: setRooms },
+    { key: getScopedKey(KEYS.JOURNALS) || KEYS.JOURNALS, val: journals, set: setJournals },
   ];
 
   const syncItemsRef = useRef(syncItems);
@@ -203,12 +205,21 @@ export function SyncManager() {
             .eq('user_id', user.id);
 
             if (dbError) {
-                console.error('SyncManager: Failed to fetch user_data.', dbError);
-                toast({
-                    title: 'Sync Failed',
-                    description: 'Could not fetch cloud data. Changes may not be saved to other devices.',
-                    variant: 'destructive',
-                });
+                // Check if table missing (postgrest error)
+                if ((dbError as any).code === 'PGRST116' || (dbError as any).message?.includes('does not exist')) {
+                    console.error('SyncManager: EMERGENCY - table "user_data" does not exist in Supabase!');
+                    toast({
+                        title: 'Backend Setup Required',
+                        description: 'The "user_data" table is missing in your Supabase project. Please run the schema SQL.',
+                        variant: 'destructive',
+                    });
+                } else {
+                    console.error('SyncManager: Failed to fetch user_data.', dbError);
+                    toast({
+                        title: 'Sync Offline',
+                        description: 'Using local data only. Cloud sync will resume when available.',
+                    });
+                }
                 return;
             }
 
@@ -233,16 +244,38 @@ export function SyncManager() {
                             // Special handling for app_settings to enforce navigation structure
                             if (item.key === 'app_settings' && mergedValue && mergedValue.navStructure) {
                                 // Always override navStructure with the latest from code to prevent ghost menus
-                                mergedValue.navStructure = allNavItems;
+                                // and explicitly filter out any remnants of the Brand Room feature
+                                const sanitizeNav = (structure: NavGroup[]): NavGroup[] => {
+                                    return structure
+                                        .filter(g => g.label !== 'Brand')
+                                        .map(g => ({
+                                            ...g,
+                                            items: g.items.filter(i => i.href !== '/brand-room' && i.label !== 'Brand Room')
+                                        }))
+                                        .filter(g => g.items.length > 0 || !['Core Control', 'Alfred AI', 'Growth & Strategy', 'Research & Knowledge', 'Finance & Assets', 'Connections & Learning'].includes(g.label));
+                                };
+
+                                mergedValue.navStructure = sanitizeNav(allNavItems);
                                 
-                                // Ensure visibleGroups are consistent
+                                // Ensure visibleGroups are consistent (Only keep groups that exist in code)
+                                const validGroupLabels = new Set(allNavItems.map(g => g.label));
                                 const existingVisible = mergedValue.sidebar?.visibleGroups || [];
-                                const visibleSet = new Set(existingVisible);
-                                allNavItems.forEach(g => visibleSet.add(g.label));
+                                
+                                // Filter out groups that no longer exist and ensure all new groups are included
+                                const updatedVisible = [
+                                    ...existingVisible.filter((label: string) => validGroupLabels.has(label) && label !== 'Brand'),
+                                    ...allNavItems.filter(g => !existingVisible.includes(g.label)).map(g => g.label)
+                                ];
+
                                 mergedValue.sidebar = {
                                     ...mergedValue.sidebar,
-                                    visibleGroups: Array.from(visibleSet)
+                                    visibleGroups: updatedVisible
                                 };
+
+                                // Clean up shortcuts
+                                if (mergedValue.shortcuts && mergedValue.shortcuts.goToBrandRoom) {
+                                  delete mergedValue.shortcuts.goToBrandRoom;
+                                }
                             }
 
                             // Update Local if different
@@ -430,7 +463,7 @@ export function SyncManager() {
     transactions, accounts, goals, researchSessions, activities, 
     learningResources, networkContacts, vaultFiles, vaultFolders,
     userProfile, appSettings, brandProfile, assets, budgets, debts,
-    recurringTransactions, savingsGoals, events, calendars, rooms, isDataLoaded, isCloudSynced
+    recurringTransactions, savingsGoals, events, calendars, rooms, journals, isDataLoaded, isCloudSynced
   ]);
 
   return null;

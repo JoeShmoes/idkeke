@@ -546,13 +546,10 @@ if (!gotTheLock) {
   const isDev = !app.isPackaged;
   
   if (isDev) {
-    win.loadURL('http://localhost:9002');
+    win.loadURL('http://localhost:9002/login');
   } else {
-    // Online mode: Load the production URL
-    // win.loadURL('https://app.nexarismedia.online/dashboard');
-    
-    // Offline mode: Load from local export
-    win.loadFile(path.join(__dirname, '../out/index.html'));
+    // Online wrapper mode: Load the production URL directly to the login page
+    win.loadURL('https://nexarismodule.online/login');
   }
 
   win.setMenuBarVisibility(false);

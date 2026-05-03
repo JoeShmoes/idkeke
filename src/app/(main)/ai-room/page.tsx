@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Send, Mic, BrainCircuit, User, Loader2, Wand2, Edit, Trash2, Maximize2, Paperclip, Brain, Search, Globe, MessageSquare, FileText, X, ChevronDown, PieChart, BarChart as BarChartIcon, ClipboardCheck, RefreshCw, Plus, CheckSquare, Play } from 'lucide-react';
@@ -349,6 +348,7 @@ export default function AiRoomPage() {
   } = useApp();
 
   const [currentChatId, setCurrentChatId] = useState<string>('');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -714,7 +714,6 @@ IN-APP LINKS:
   - Health: [/health](/health)
   - Learning: [/learning](/learning)
   - Networking: [/networking](/networking)
-  - Brand Room: [/brand-room](/brand-room)
 - Only create links for locations that actually exist in this list.`;
 
     // Handle file attachments
@@ -811,8 +810,8 @@ IN-APP LINKS:
         if (onChunk) onChunk(content);
       } else {
         const controller = new AbortController();
-        // 30s timeout for initial connection/response start
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        // 60s timeout for initial connection/response start (accommodates slow searches)
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         try {
           const response = await fetch(LOCAL_AI_ENDPOINT, {
@@ -828,7 +827,8 @@ IN-APP LINKS:
             let details = '';
             try {
                const payload = await response.json();
-               details = typeof payload?.details === 'string' ? payload.details : '';
+               details = typeof payload?.details === 'string' ? payload.details : 
+                         (typeof payload?.error === 'string' ? payload.error : '');
             } catch (e) {}
             
             setIsSearchingWeb(false);
@@ -1639,38 +1639,33 @@ IN-APP LINKS:
   };
 
   const buildFilePreviews = async (files: File[]): Promise<FilePreview[]> => {
-    const newPreviews: FilePreview[] = [];
-
-    for (const file of files) {
-      let preview: string | null = null;
-      let type: FilePreview['type'] = 'other';
-
-      if (file.type.startsWith('image/')) {
-        type = 'image';
-        preview = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(file);
+    const previewPromises = files.map(file => {
+        return new Promise<FilePreview>((resolve) => {
+            let type: FilePreview['type'] = 'other';
+            
+            if (file.type.startsWith('image/')) {
+                type = 'image';
+                const reader = new FileReader();
+                reader.onload = (e) => resolve({ file, preview: e.target?.result as string, type });
+                reader.onerror = () => resolve({ file, preview: null, type });
+                reader.readAsDataURL(file);
+            } else if (file.type === 'application/pdf') {
+                type = 'pdf';
+                resolve({ file, preview: URL.createObjectURL(file), type });
+            } else if (file.type.startsWith('text/')) {
+                type = 'text';
+                const reader = new FileReader();
+                reader.onload = (e) => resolve({ file, preview: e.target?.result as string, type });
+                reader.onerror = () => resolve({ file, preview: null, type });
+                reader.readAsText(file);
+            } else {
+                type = 'other';
+                resolve({ file, preview: URL.createObjectURL(file), type });
+            }
         });
-      } else if (file.type === 'application/pdf') {
-        type = 'pdf';
-        preview = URL.createObjectURL(file);
-      } else if (file.type.startsWith('text/')) {
-        type = 'text';
-        preview = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsText(file);
-        });
-      } else {
-        type = 'other';
-        preview = URL.createObjectURL(file);
-      }
+    });
 
-      newPreviews.push({ file, preview, type });
-    }
-
-    return newPreviews;
+    return await Promise.all(previewPromises);
   };
 
   const addFilesToPreviews = async (files: FileList | File[]) => {
@@ -1685,7 +1680,10 @@ IN-APP LINKS:
 
     await addFilesToPreviews(files);
 
-    // Don't auto-add to input - let user decide what to ask about the files
+    // Reset input to allow re-uploading the same file if needed
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
   };
 
   const removeFilePreview = (index: number) => {
@@ -1859,8 +1857,11 @@ IN-APP LINKS:
   
   return (
     <>
-      <div className="flex h-full bg-gradient-to-br from-background via-background to-muted/10">
-        <div className="w-80 border-r border-border/50 bg-background/95 backdrop-blur-md flex-shrink-0 h-full flex flex-col overflow-hidden">
+      <div className="flex h-full bg-gradient-to-br from-background via-background to-muted/10 relative overflow-hidden font-sans">
+        <div className={cn(
+          "border-r border-border/50 bg-background/95 backdrop-blur-md flex-shrink-0 h-full flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
+          isSidebarCollapsed ? "w-16" : "w-80"
+        )}>
             <AiSidebar
               chats={chats}
               currentChatId={currentChatId}
@@ -1869,6 +1870,8 @@ IN-APP LINKS:
               deleteChats={deleteChats}
               renameChat={renameChat}
               onNewChat={createNewChat}
+              isCollapsed={isSidebarCollapsed}
+              setIsCollapsed={setIsSidebarCollapsed}
             />
         </div>
 
@@ -2050,7 +2053,7 @@ IN-APP LINKS:
                               >
                                 {msg.isEditing ? (
                                   <div className="space-y-2 min-w-[300px]">
-                                    <Textarea
+                                    <textarea
                                       value={msg.text}
                                       onChange={(e) => {
                                         setMessages((prev) =>
@@ -2059,7 +2062,8 @@ IN-APP LINKS:
                                           )
                                         );
                                       }}
-                                      className="min-h-[100px] bg-background text-foreground"
+                                      style={{ outline: 'none', boxShadow: 'none' }}
+                                      className="min-h-[100px] w-full resize-none rounded-md bg-background text-foreground border border-border/50 px-3 py-2 text-sm focus:border-border"
                                       autoFocus
                                     />
                                     <div className="flex gap-2 justify-end">
@@ -2387,7 +2391,7 @@ IN-APP LINKS:
                   onDragLeave={handleInputDragLeave}
                   onDrop={handleInputDrop}
                 >
-                  <Textarea
+                  <textarea
                     ref={textareaRef}
                     placeholder={
                       isListening
@@ -2407,7 +2411,8 @@ IN-APP LINKS:
                         handleSendMessage();
                       }
                     }}
-                    className="w-full resize-none p-4 pr-32 text-base border-0 focus-visible:ring-0 shadow-none bg-transparent rounded-2xl min-h-[60px] max-h-64"
+                    style={{ outline: 'none', boxShadow: 'none' }}
+                    className="w-full resize-none p-4 pr-32 text-base border-0 ring-0 bg-transparent rounded-2xl min-h-[60px] max-h-64"
                     rows={1}
                   />
                   <div className="flex items-center justify-between px-3 pb-3">

@@ -52,54 +52,65 @@ export default function AddActivityDialog({ isOpen, onOpenChange, onSave, activi
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>{activityToEdit ? 'Edit Activity' : 'Create New Activity'}</DialogTitle>
-            <DialogDescription>
-              Enter the details for your activity below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Activity Title</Label>
+      <DialogContent className="max-w-[90vw] w-[440px] max-h-[calc(100dvh-50px)] rounded-[48px] px-6 pt-10 pb-8 sm:px-8 sm:pt-12 sm:pb-10 border border-white/10 bg-[#0F0F0F] text-white shadow-2xl flex flex-col gap-6 sm:gap-8 overflow-hidden z-[300]">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-16 h-1.5 rounded-full bg-white/10" />
+        
+        <DialogHeader className="text-left space-y-1">
+          <DialogTitle className="text-2xl sm:text-4xl font-black italic uppercase tracking-tighter text-white">
+            {activityToEdit ? 'Edit Activity' : 'New Activity'}
+          </DialogTitle>
+          <DialogDescription className="text-[10px] font-bold opacity-40 uppercase tracking-[0.2em] text-white/60">
+            Define your discipline
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-8 overflow-hidden">
+          <div className="space-y-6 sm:space-y-8 pb-6">
+            <div className="space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ml-2">Activity Name</Label>
               <Input 
-                id="title" 
                 value={title} 
-                onChange={(e) => setTitle(e.target.value)} 
-                placeholder="e.g., Boxing" 
-                required
-                autoFocus
+                onChange={e => setTitle(e.target.value)} 
+                placeholder="What are we training?" 
+                className="h-16 sm:h-20 rounded-[32px] text-lg sm:text-2xl font-bold bg-white/5 border-2 border-transparent focus:border-indigo-500/50 px-8 transition-all text-white placeholder:text-white/20"
+                autoFocus 
               />
             </div>
-            <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+
+            <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ml-2">Description</Label>
                 <Textarea
-                    id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Briefly describe this activity."
+                    className="min-h-[140px] rounded-[32px] text-lg bg-white/5 border-2 border-transparent focus:border-indigo-500/50 px-8 py-6 transition-all resize-none text-white placeholder:text-white/20"
                     required
                 />
             </div>
-            <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+
+            <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ml-2">Category</Label>
                 <Select value={category} onValueChange={(value: ActivityCategory) => setCategory(value)}>
-                    <SelectTrigger id="category">
+                    <SelectTrigger className="h-14 sm:h-16 rounded-[28px] bg-white/5 border-none px-6 font-bold text-white transition-all hover:bg-white/10">
                         <SelectValue placeholder="Select category" />
                     </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="combat">Combat</SelectItem>
-                        <SelectItem value="endurance">Endurance</SelectItem>
-                        <SelectItem value="strength">Strength</SelectItem>
-                        <SelectItem value="flexibility">Flexibility</SelectItem>
+                    <SelectContent className="rounded-[32px] border-white/10 bg-[#1A1A1A] text-white">
+                        <SelectItem value="combat" className="rounded-2xl py-4">Combat</SelectItem>
+                        <SelectItem value="endurance" className="rounded-2xl py-4">Endurance</SelectItem>
+                        <SelectItem value="strength" className="rounded-2xl py-4">Strength</SelectItem>
+                        <SelectItem value="flexibility" className="rounded-2xl py-4">Flexibility</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">{activityToEdit ? 'Save Changes' : 'Create Activity'}</Button>
+
+          <DialogFooter className="pt-4 sm:pt-6 gap-4 sm:flex-row flex-col mt-auto">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="h-16 sm:h-20 flex-1 rounded-[32px] font-bold text-white/40 hover:text-white hover:bg-white/5">
+              Cancel
+            </Button>
+            <Button type="submit" className="h-16 sm:h-20 flex-[2.5] rounded-[32px] font-black uppercase tracking-[0.2em] bg-indigo-500 hover:bg-indigo-600 text-white shadow-2xl shadow-indigo-500/30 gap-3 active:scale-95 transition-transform">
+              {activityToEdit ? 'Update' : 'Commit'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

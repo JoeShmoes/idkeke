@@ -17,6 +17,7 @@ import {
 import Logo from '@/components/logo';
 import { Settings, LogOut, User, Folder, MessageSquare, Coffee, DollarSign, Loader2 } from 'lucide-react';
 import { useApp } from './app-provider';
+import DonationDialog from '@/components/support/donation-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -171,6 +172,7 @@ interface AppSidebarProps {
 
 export default function AppSidebar({ className }: AppSidebarProps) {
   const { userProfile, appSettings, chats, setUserProfile, setIsSettingsOpen } = useApp();
+  const [isDonationOpen, setIsDonationOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -188,7 +190,6 @@ export default function AppSidebar({ className }: AppSidebarProps) {
             '/clients': 'goToClients',
             '/research': 'goToResearch',
             '/notes': 'goToNotes',
-            '/brand-room': 'goToBrandRoom',
             '/budgeting': 'goToBudgeting',
             '/asset-tracker': 'goToAssets',
             '/file-vault': 'goToFileVault',
@@ -213,19 +214,46 @@ export default function AppSidebar({ className }: AppSidebarProps) {
     }).join(' + ');
   };
 
+  // Recurring Donation Timer (40 minutes)
+  useEffect(() => {
+    const FORTY_MINUTES = 40 * 60 * 1000;
+    const LAST_KEY = 'donation_last_shown_at';
+
+    const checkTimer = () => {
+      const lastShown = localStorage.getItem(LAST_KEY);
+      const now = Date.now();
+
+      if (!lastShown) {
+        // First time, initialize the timer but don't show yet (give them 40 mins)
+        localStorage.setItem(LAST_KEY, String(now));
+        return;
+      }
+
+      if (now - Number(lastShown) >= FORTY_MINUTES) {
+        setIsDonationOpen(true);
+      }
+    };
+
+    // Check immediately on mount
+    checkTimer();
+
+    // Then check every minute
+    const interval = setInterval(checkTimer, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleSupportClick = (type: 'coffee' | 'monthly') => {
-    const url = type === 'monthly' 
-      ? 'https://nexarismodule.gumroad.com/l/rhyybu?_gl=1*1codf41*_ga*NTIyMzc0NjQwLjE3NjU0NzM3NDY.*_ga_6LJN6D94N6*czE3NjY0NDA3MjEkbzE4JGcwJHQxNzY2NDQwNzIxJGo2MCRsMCRoMA..'
-      : 'https://nexarismodule.gumroad.com/coffee';
-    
-    window.open(url, '_blank');
+    setIsDonationOpen(true);
   };
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      // The auth listener in AppProvider will handle the redirect and data clearing
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Additional local cleanup
       localStorage.removeItem('contextflow-workspace-key');
-      setUserProfile({ name: 'User', email: '', firstName: '', lastName: '', hasSeenTour: false });
       window.location.href = '/login';
     } catch (error) {
       console.error('Error logging out:', error);
@@ -240,9 +268,9 @@ export default function AppSidebar({ className }: AppSidebarProps) {
   return (
     <Sidebar
       className={cn("border-r", className)}
-      variant={appSettings.sidebar.variant}
-      side={appSettings.sidebar.side}
-      collapsible={appSettings.sidebar.collapsible}
+      variant={appSettings?.sidebar?.variant}
+      side={appSettings?.sidebar?.side}
+      collapsible={appSettings?.sidebar?.collapsible}
     >
       <SidebarHeader className="h-16 flex flex-row items-center px-2 py-0 border-b gap-3">
         <DropdownMenu>
@@ -287,7 +315,7 @@ export default function AppSidebar({ className }: AppSidebarProps) {
         <ScrollArea className="h-full">
           <SidebarMenu>
             {navStructure.map((group) => {
-              const isVisible = appSettings.sidebar.visibleGroups?.includes(group.label);
+              const isVisible = appSettings?.sidebar?.visibleGroups?.includes(group.label);
               if (!isVisible) return null;
 
               return (
@@ -305,8 +333,11 @@ export default function AppSidebar({ className }: AppSidebarProps) {
 
       {/* Footer */}
       <SidebarFooter>
-        <div className="flex items-center justify-between w-full p-2 h-14 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center border-t">
-          <div className="group/logo flex items-center gap-2 flex-shrink-0 select-none group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:p-2">
+        <div className="flex items-center justify-between w-full p-2 h-14 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
+          <div 
+            className="group/logo flex items-center gap-2 flex-shrink-0 select-none group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:p-2 cursor-pointer"
+            onClick={() => handleSupportClick('coffee')}
+          >
             <Logo
               className="h-7 w-7 text-primary transition-transform duration-300 group-hover/logo:scale-110"
             />
@@ -342,6 +373,7 @@ export default function AppSidebar({ className }: AppSidebarProps) {
             </div>
           </div>
       </SidebarFooter>
+      <DonationDialog open={isDonationOpen} onOpenChange={setIsDonationOpen} />
     </Sidebar>
   );
 }

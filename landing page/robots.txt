@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
+Allow: /dashboard
+Allow: /notes
+Allow: /tasks
+Allow: /journal
 
 Sitemap: https://nexarismodule.online/sitemap.xml

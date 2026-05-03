@@ -3,15 +3,15 @@
 import type { IconName } from './icons';
 
 export interface NavItem {
-    href: string;
-    label: string;
-    icon: IconName;
-    external?: boolean;
+  href: string;
+  label: string;
+  icon: IconName;
+  external?: boolean;
 }
-  
+
 export interface NavGroup {
-    label: string;
-    items: NavItem[];
+  label: string;
+  items: NavItem[];
 }
 
 export interface ChecklistItem {
@@ -61,6 +61,16 @@ export interface Note {
   parentId?: string;
 }
 
+export interface JournalEntry {
+  id: string;
+  title: string;
+  content: any; // Yoopta content
+  createdAt: number;
+  updatedAt: number;
+  mood?: string;
+  tags?: string[];
+}
+
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
 export type TaskView = 'default' | 'groupByDate' | 'kanban';
 
@@ -83,25 +93,28 @@ export interface Task {
   notifications: boolean;
   groupId: string;
   createdAt: string;
+  updatedAt?: string;
   dueDate?: string; // ISO date string
   repeat?: RepeatDays;
-  order?: number;
+  priority: 'low' | 'medium' | 'high';
   // for legacy search compatibility
   text: string;
   status: TaskStatus;
+  order?: number;
 }
 
 export interface TaskGroup {
   id: string;
   name: string;
+  order?: number;
 }
 
 export interface Project {
-    id: string;
-    name: string;
-    description: string;
-    status: 'not-started' | 'in-progress' | 'completed';
-    links?: { title: string; url: string }[];
+  id: string;
+  name: string;
+  description: string;
+  status: 'not-started' | 'in-progress' | 'completed';
+  links?: { title: string; url: string }[];
 }
 
 export type ClientStatus = 'lead' | 'active' | 'inactive';
@@ -129,7 +142,7 @@ export interface Transaction {
 }
 
 export interface Account {
-  id:string;
+  id: string;
   name: string;
   balance: number;
   type: 'checking' | 'savings' | 'investment' | 'credit' | 'loan' | 'cash';
@@ -197,9 +210,9 @@ export interface LogoAsset {
 }
 
 export interface BrandLink {
-    id: string;
-    title: string;
-    url: string;
+  id: string;
+  title: string;
+  url: string;
 }
 
 export interface BrandProfile {
@@ -261,28 +274,28 @@ export interface AIMemory {
 }
 
 export interface GrowthTaskCriteria {
-    type: 'project_count' | 'task_count' | 'note_count' | 'client_count' | 'net_worth' | 'manual';
-    target?: number;
-    category?: string;
+  type: 'project_count' | 'task_count' | 'note_count' | 'client_count' | 'net_worth' | 'manual';
+  target?: number;
+  category?: string;
 }
 
 export interface GrowthTask {
-    id: string;
-    title: string;
-    description: string;
-    xp: number;
-    difficulty: 'easy' | 'medium' | 'hard' | 'expert';
-    status: 'pending' | 'completed';
-    category: 'learning' | 'health' | 'productivity' | 'finance';
-    icon?: string;
-    criteria?: GrowthTaskCriteria;
-    path?: string; // Route to navigate to for completing the task
+  id: string;
+  title: string;
+  description: string;
+  xp: number;
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  status: 'pending' | 'completed';
+  category: 'learning' | 'health' | 'productivity' | 'finance';
+  icon?: string;
+  criteria?: GrowthTaskCriteria;
+  path?: string; // Route to navigate to for completing the task
 }
 
 export interface GrowthHistory {
-    date: string;
-    xpGained: number;
-    tasksCompleted: number;
+  date: string;
+  xpGained: number;
+  tasksCompleted: number;
 }
 
 export interface AnswerFromDocumentOutput {
@@ -306,54 +319,54 @@ export type LearningResourceType = 'article' | 'video' | 'course' | 'book' | 'po
 export type LearningResourceStatus = 'todo' | 'in-progress' | 'completed';
 
 export interface LearningResource {
-    id: string;
-    title: string;
-    url: string;
-    type: LearningResourceType;
-    status: LearningResourceStatus;
-    notes?: string;
-    createdAt: string;
-    icon?: string;
+  id: string;
+  title: string;
+  url: string;
+  type: LearningResourceType;
+  status: LearningResourceStatus;
+  notes?: string;
+  createdAt: string;
+  icon?: string;
 }
 
 export interface NetworkContact {
-    id: string;
-    name: string;
-    role: string;
-    company: string;
-    lastContacted: string; // ISO date string
-    notes?: string;
-    icon?: string;
-    meetingLink?: string;
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  lastContacted: string; // ISO date string
+  notes?: string;
+  icon?: string;
+  meetingLink?: string;
 }
 
 export interface UserProfile {
-    name: string;
-    firstName?: string;
-    lastName?: string;
-    email: string;
-    phoneNumber?: string;
-    hasCompletedSetup?: boolean;
-    hasSeenTour?: boolean;
-    meetingLink?: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  phoneNumber?: string;
+  hasCompletedSetup?: boolean;
+  hasSeenTour?: boolean;
+  meetingLink?: string;
 }
 
 export interface VaultFile {
-    id: string;
-    name: string;
-    type: string;
-    size: number;
-    uploadedAt: string; // ISO date string
-    content: string; // Base64 encoded content
-    folderId?: string;
-    starred: boolean;
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  uploadedAt: string; // ISO date string
+  content: string; // Base64 encoded content
+  folderId?: string;
+  starred: boolean;
 }
 
 export interface VaultFolder {
-    id: string;
-    name: string;
-    parentId?: string;
-    starred: boolean;
+  id: string;
+  name: string;
+  parentId?: string;
+  starred: boolean;
 }
 
 export interface SheetFile {
@@ -364,102 +377,105 @@ export interface SheetFile {
 }
 
 export interface Milestone {
-    id: string;
-    text: string;
-    completed: boolean;
+  id: string;
+  text: string;
+  completed: boolean;
 }
-  
+
 export type GoalStatus = 'on-track' | 'at-risk' | 'off-track' | 'achieved' | 'on-hold';
 export type GoalCategory = 'personal' | 'professional' | 'financial' | 'health' | 'learning';
-  
+
 export interface Goal {
-    id: string;
-    title: string;
-    description: string;
-    status: GoalStatus;
-    category: GoalCategory;
-    targetDate: string; // ISO date string
-    milestones: Milestone[];
+  id: string;
+  title: string;
+  description: string;
+  status: GoalStatus;
+  category: GoalCategory;
+  targetDate: string; // ISO date string
+  milestones: Milestone[];
 }
 
 export interface Shortcut {
-    name: string;
-    keys: string[];
+  name: string;
+  keys: string[];
 }
 
 export interface SearchResult {
-    title: string;
-    url: string;
-    snippet: string;
-    sourceName?: string;
-    publishedAt?: string;
-  }
+  title: string;
+  url: string;
+  snippet: string;
+  sourceName?: string;
+  publishedAt?: string;
+}
 
-export type Theme = 'light' | 'dark' | 'theme-matrix' | 'theme-rose-pine' | 'theme-solarized-light' | 'theme-tokyo-night' | 'theme-dracula' | 'theme-gruvbox' | 'theme-nord' | 'theme-batman' | 'theme-god-mode';
+export type Theme = 'light' | 'dark' | 'system' | 'theme-matrix' | 'theme-rose-pine' | 'theme-solarized-light' | 'theme-tokyo-night' | 'theme-dracula' | 'theme-gruvbox' | 'theme-nord' | 'theme-batman' | 'theme-god-mode';
 export type SidebarSide = 'left' | 'right';
 export type SidebarVariant = 'sidebar' | 'floating' | 'inset';
 export type SidebarCollapsible = 'offcanvas' | 'icon' | 'none';
 
 export interface AppSettings {
-    theme: Theme;
-    themeCycle: Theme[];
-    autosave: boolean;
-    timeFormat: '12-hour' | '24-hour';
-    notificationsEnabled: boolean;
-    navStructure: NavGroup[];
-    sidebar: {
-        visibleGroups: string[];
-        side: SidebarSide;
-        variant: SidebarVariant;
-        collapsible: SidebarCollapsible;
-    };
-    commandPalette: {
-        includeTasks: boolean;
-        includeNotes: boolean;
-        includeContacts: boolean;
-        includeProjects: boolean;
-    };
-    rightSidebar: {
-        isOpen: boolean;
-        order: ('notifications' | 'activities' | 'contacts')[];
-    };
-    tasks: {
-        defaultGroupId: string;
-        defaultView: TaskView;
-        kanbanColumns: string[];
-        hideCompletedTasks: boolean;
-    };
-    finance: {
-        defaultCurrency: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'CAD';
-        lowBalanceThreshold: number;
-        privacyMode: boolean;
-    };
-    shortcuts: {
-        toggleSearch: Shortcut;
-        toggleTheme: Shortcut;
-        toggleSidebar: Shortcut;
-        toggleRightSidebar: Shortcut;
-        newTask: Shortcut;
-        newNote: Shortcut;
-        goToDashboard: Shortcut;
-        goToAlfred: Shortcut;
-        goToGrowthHub: Shortcut;
-        goToTasks: Shortcut;
-        goToResearch: Shortcut;
-        goToNotes: Shortcut;
-        goToClients: Shortcut;
-        goToProjects: Shortcut;
-        goToBudgeting: Shortcut;
-        goToAssets: Shortcut;
-        goToBrandRoom: Shortcut;
-        goToFileVault: Shortcut;
-        goToHealth: Shortcut;
-        goToLearning: Shortcut;
-        goToNetworking: Shortcut;
-        goToBriefingRoom: Shortcut;
-        goToWorkshop: Shortcut;
-        goToAutomation: Shortcut;
-    }
+  theme: Theme;
+  themeCycle: Theme[];
+  autosave: boolean;
+  timeFormat: '12-hour' | '24-hour';
+  notificationsEnabled: boolean;
+  showToasts: boolean;
+  navStructure: NavGroup[];
+  sidebar: {
+    visibleGroups: string[];
+    side: SidebarSide;
+    variant: SidebarVariant;
+    collapsible: SidebarCollapsible;
+  };
+  commandPalette: {
+    includeTasks: boolean;
+    includeNotes: boolean;
+    includeContacts: boolean;
+    includeProjects: boolean;
+  };
+  rightSidebar: {
+    isOpen: boolean;
+    order: ('notifications' | 'activities' | 'contacts')[];
+  };
+  tasks: {
+    defaultGroupId: string;
+    defaultView: TaskView;
+    kanbanColumns: string[];
+    hideCompletedTasks: boolean;
+    expandedGroups?: string[];
+  };
+  finance: {
+    defaultCurrency: 'USD' | 'EUR' | 'GBP' | 'JPY' | 'CAD';
+    lowBalanceThreshold: number;
+    privacyMode: boolean;
+  };
+  shortcuts: {
+    toggleSearch: Shortcut;
+    toggleTheme: Shortcut;
+    toggleSidebar: Shortcut;
+    toggleRightSidebar: Shortcut;
+    newTask: Shortcut;
+    newNote: Shortcut;
+    goToDashboard: Shortcut;
+    goToAlfred: Shortcut;
+    goToGrowthHub: Shortcut;
+    goToTasks: Shortcut;
+    goToResearch: Shortcut;
+    goToNotes: Shortcut;
+    goToClients: Shortcut;
+    goToProjects: Shortcut;
+    goToBudgeting: Shortcut;
+    goToAssets: Shortcut;
+    goToBrandRoom: Shortcut;
+    goToFileVault: Shortcut;
+    goToHealth: Shortcut;
+    goToLearning: Shortcut;
+    goToNetworking: Shortcut;
+    goToBriefingRoom: Shortcut;
+    goToWorkshop: Shortcut;
+    goToAutomation: Shortcut;
+    goToJournal: Shortcut;
+  }
 }
 
 export interface AppContextType {
@@ -507,4 +523,6 @@ export interface AppContextType {
   setSelectedRoom: React.Dispatch<React.SetStateAction<string | null>>;
   aiMessageCount: number;
   setAiMessageCount: React.Dispatch<React.SetStateAction<number>>;
+  journals: JournalEntry[];
+  setJournals: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
 }

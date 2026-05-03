@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '../ui/button';
-import { Search, Folder as FolderIcon, ArrowRight, Command } from 'lucide-react';
+import { Search, Folder as FolderIcon, ArrowRight, Command, X } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useApp } from './app-provider';
@@ -115,17 +115,24 @@ type SearchableItem =
     | SearchableAsset
     | SearchableLearningResource
     | SearchableActivity
-    | SearchableVaultFile;
+    | SearchableVaultFile
+    | SearchableJournal;
+
+interface SearchableJournal extends JournalEntry {
+    type: 'journal';
+    href: string;
+    icon: React.ElementType;
+}
 
 
-export default function SearchPalette() {
+export default function SearchPalette({ compact = false }: { compact?: boolean }) {
     const { open, setOpen } = useCommandPalette();
     const [searchTerm, setSearchTerm] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
     const router = useRouter();
     const { 
         notes, tasks, networkContacts, projects, clients, accounts, assets, learningResources, activities, vaultFiles,
-        appSettings, isMac 
+        journals, appSettings, isMac 
     } = useApp();
     const shortcut = appSettings.shortcuts.toggleSearch;
     
@@ -207,6 +214,10 @@ export default function SearchPalette() {
             ...f, type: 'file' as const, href: '/file-vault', icon: iconMap['Lock'] || FolderIcon
           })) : [];
 
+          const journalsForSearch: SearchableJournal[] = Array.isArray(journals) ? journals.map(j => ({
+            ...j, type: 'journal' as const, href: '/journal', icon: iconMap['PenLine'] || FolderIcon
+          })) : [];
+
           const includeTasks = appSettings.commandPalette?.includeTasks ?? true;
           const includeContacts = appSettings.commandPalette?.includeContacts ?? true;
           const includeProjects = appSettings.commandPalette?.includeProjects ?? true;
@@ -222,6 +233,7 @@ export default function SearchPalette() {
             ...learningForSearch,
             ...activitiesForSearch,
             ...vaultFilesForSearch,
+            ...journalsForSearch,
         ];
     }, [notes, tasks, networkContacts, projects, clients, accounts, assets, learningResources, activities, vaultFiles, appSettings.commandPalette]);
 
@@ -265,6 +277,7 @@ export default function SearchPalette() {
                 case 'learning resource': key = 'Learning'; break;
                 case 'activity': key = 'Activities'; break;
                 case 'file': key = 'Files'; break;
+                case 'journal': key = 'Journal'; break;
                 default: key = 'Other';
             }
             if (!acc[key]) acc[key] = [];
@@ -276,7 +289,7 @@ export default function SearchPalette() {
     // Flatten for keyboard navigation
     const flatItemList = useMemo(() => {
          // Sort groups so Navigation comes first
-         const order = ['Navigation', 'Projects', 'Tasks', 'Files', 'Contacts', 'Clients', 'Accounts', 'Assets', 'Learning', 'Activities', 'Other'];
+         const order = ['Navigation', 'Projects', 'Tasks', 'Journal', 'Files', 'Contacts', 'Clients', 'Accounts', 'Assets', 'Learning', 'Activities', 'Other'];
          const sortedKeys = Object.keys(groupedItems).sort((a, b) => {
              const indexA = order.indexOf(a);
              const indexB = order.indexOf(b);
@@ -337,17 +350,16 @@ export default function SearchPalette() {
     <>
         <Button
             variant="outline"
-            className="w-full justify-between text-muted-foreground h-9 px-3 shadow-none bg-muted/50 hover:bg-muted/80 transition-all group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:p-0"
+            className={cn(
+                "justify-between text-muted-foreground h-9 px-3 shadow-none bg-muted/50 hover:bg-muted/80 transition-all group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:p-0",
+                compact ? "w-auto px-2" : "w-full"
+            )}
             onClick={() => setOpen(true)}
         >
             <div className="flex items-center gap-2">
                 <Search className="h-4 w-4 opacity-50" />
-                <span className="group-data-[collapsible=icon]:hidden text-sm">Search...</span>
+                {!compact && <span className="group-data-[collapsible=icon]:hidden text-sm">Search...</span>}
             </div>
-            <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 group-data-[collapsible=icon]:hidden sm:flex shadow-sm">
-                <span className="text-xs">{isMac ? '⌘' : 'Ctrl'}</span>
-                {shortcut.keys.find(k => k !== 'mod')?.toUpperCase() || 'K'}
-            </kbd>
         </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -366,14 +378,22 @@ export default function SearchPalette() {
                     placeholder="What do you need?"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="border-0 shadow-none focus-visible:ring-0 h-14 text-lg bg-transparent placeholder:text-muted-foreground/50 px-0"
+                    className="border-0 shadow-none focus-visible:ring-0 h-10 text-[13px] bg-transparent placeholder:text-muted-foreground/40 px-0"
                     autoFocus
                 />
+                {searchTerm && (
+                    <button 
+                        onClick={() => setSearchTerm('')}
+                        className="p-1 hover:bg-white/5 rounded-full text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
                 <div className="flex items-center gap-2">
                 </div>
             </div>
 
-            <ScrollArea className="h-[60vh] sm:h-[550px]">
+            <ScrollArea className="h-[50vh] sm:h-[420px]">
                 <div className="p-2">
                     {flatItemList.length > 0 ? (
                          // We iterate by groups to render headers, but we need to map flatItemList to indices
@@ -431,7 +451,7 @@ export default function SearchPalette() {
                                                         }
                                                     }}
                                                     className={cn(
-                                                        "flex items-center justify-between gap-3 px-3 py-3 rounded-lg transition-all cursor-pointer group relative scroll-mt-10", 
+                                                        "flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-all cursor-pointer group relative scroll-mt-10", 
                                                         isActive ? 'bg-accent/50 text-accent-foreground' : 'text-muted-foreground hover:bg-accent/30'
                                                     )}
                                                 >
@@ -446,11 +466,11 @@ export default function SearchPalette() {
                                                     )}
 
                                                     <div className="flex items-center gap-4 overflow-hidden flex-1">
-                                                        <div className={cn("p-2 rounded-md transition-colors", isActive ? "bg-background shadow-sm" : "bg-muted/30")}>
-                                                            <Icon className={cn("h-5 w-5", item.type === 'task' && 'completed' in item && item.completed && "text-green-500")} />
+                                                        <div className={cn("p-1.5 rounded-md transition-colors", isActive ? "bg-background shadow-sm" : "bg-muted/30")}>
+                                                            <Icon className={cn("h-4 w-4", item.type === 'task' && 'completed' in item && item.completed && "text-green-500")} />
                                                         </div>
                                                         <div className="flex flex-col overflow-hidden">
-                                                                <span className={cn("text-sm font-medium truncate transition-colors", isActive ? "text-foreground" : "")}>
+                                                                <span className={cn("text-[13px] font-medium truncate transition-colors", isActive ? "text-foreground" : "")}>
                                                                     {title}
                                                                 </span>
                                                                 {content && (
@@ -492,14 +512,6 @@ export default function SearchPalette() {
                      <span className="flex items-center gap-1">
                         <kbd className="bg-background/50 border border-white/10 rounded px-1 min-w-[20px] text-center">↵</kbd>
                         <span>to select</span>
-                     </span>
-                </div>
-                <div>
-                     <span className="flex items-center gap-1">
-                        <span className="opacity-70">Pro Tip:</span>
-                        <span>Type </span>
-                        <kbd className="bg-background/50 border border-white/10 rounded px-1">@</kbd>
-                        <span> to filter</span>
                      </span>
                 </div>
             </div>

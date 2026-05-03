@@ -14,6 +14,29 @@ const nextConfig = {
       },
     ]
   },
+  async headers() {
+    return [
+      {
+        // Prevent aggressive caching of HTML pages on iOS Safari
+        // so it always fetches the latest JS bundle references
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+    ];
+  },
   reactStrictMode: false,
   typescript: {
     ignoreBuildErrors: true,
@@ -35,9 +58,7 @@ const nextConfig = {
       }
     ],
   },
-  turbopack: {
-    root: __dirname,
-  },
+
 };
 
 export default nextConfig;

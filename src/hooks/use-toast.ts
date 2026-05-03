@@ -145,6 +145,26 @@ type Toast = Omit<ToasterToast, "id">
 function toast({ ...props }: Toast) {
   const id = genId()
 
+  const NotificationApi = typeof window !== 'undefined' ? (window as any).Notification : undefined;
+  if (NotificationApi && NotificationApi.permission === 'granted') {
+    try {
+      const titleStr = typeof props.title === 'string' ? props.title : 'Notification';
+      const descStr = typeof props.description === 'string' ? props.description : undefined;
+      
+      // iOS Safari may have Notification in window but the constructor can throw
+      // Also check it's not iOS (iOS doesn't support Web Notifications API)
+      const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (!isIOS) {
+        new NotificationApi(titleStr, {
+          body: descStr,
+          icon: '/favicon.ico',
+        });
+      }
+    } catch (e) {
+      // Silently ignore — iOS Safari throws on new Notification()
+    }
+  }
+
   const update = (props: ToasterToast) =>
     dispatch({
       type: "UPDATE_TOAST",
@@ -182,7 +202,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
 
   return {
     ...state,

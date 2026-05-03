@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/components/layout/app-provider';
+import { useSound } from '@/hooks/use-sound';
 import { useLevel } from '@/hooks/use-level';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -16,6 +17,8 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { useRouter } from 'next/navigation';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import GoogleAdBanner from '@/components/shared/google-ad-banner';
 import { 
     Award, CheckCircle, Lock, Gem, TrendingUp, Zap, 
     Target, RefreshCw, Trophy, DollarSign, Brain, Rocket,
@@ -78,11 +81,71 @@ export default function GrowthHubPage() {
     growthTasks, setGrowthTasks, growthHistory, setGrowthHistory,
     tasks, accounts, clients, notes
   } = useApp();
+    const { playSound } = useSound();
     const { currentLevel, totalPoints, pointsForNextLevel, progressToNextLevel, xpInCurrentLevel, xpRequiredForNextLevel } = useLevel();
     const { toast } = useToast();
     const router = useRouter();
     const [isLoadingAI, setIsLoadingAI] = useState(false);
     const hasGeneratedInitial = useRef(false);
+
+    // Ad Modal State
+    const [adTask, setAdTask] = useState<GrowthTask | null>(null);
+    const [adModalOpen, setAdModalOpen] = useState(false);
+    const [adTimeLeft, setAdTimeLeft] = useState(5); // 5 seconds ad simulation
+    const [adsRequired, setAdsRequired] = useState(1);
+    const [adsWatched, setAdsWatched] = useState(0);
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (adModalOpen && adTimeLeft > 0) {
+            timer = setTimeout(() => setAdTimeLeft(prev => prev - 1), 1000);
+        }
+        return () => clearTimeout(timer);
+    }, [adModalOpen, adTimeLeft]);
+
+    const handleSkipWithAd = (task: GrowthTask) => {
+        setAdTask(task);
+        const required = Math.floor(Math.random() * 3) + 1; // 1 to 3 ads
+        setAdsRequired(required);
+        setAdsWatched(0);
+        setAdTimeLeft(5);
+        setAdModalOpen(true);
+    };
+
+    const handleNextAd = () => {
+        setAdsWatched(prev => prev + 1);
+        if (adsWatched + 1 >= adsRequired) {
+             confirmSkipWithAd();
+        } else {
+             setAdTimeLeft(5); // Start timer for next ad
+        }
+    };
+
+    const confirmSkipWithAd = () => {
+        if (!adTask) return;
+        
+        // Grant full XP natively as if completed normally
+        setGrowthTasks(prev => prev.map(t => 
+            t.id === adTask.id ? { ...t, status: 'completed' } : t
+        ));
+        
+        const today = new Date().toISOString().split('T')[0];
+        setGrowthHistory(prev => {
+            const existing = prev.find(p => p.date === today);
+            if (existing) {
+                return prev.map(p => p.date === today ? { ...p, xpGained: p.xpGained + adTask.xp, tasksCompleted: p.tasksCompleted + 1 } : p);
+            }
+            return [...prev, { date: today, xpGained: adTask.xp, tasksCompleted: 1 }];
+        });
+
+        toast({
+            title: "Task Skipped",
+            description: `You watched an ad! +${adTask.xp} XP Granted.`,
+        });
+
+        setAdModalOpen(false);
+        setAdTask(null);
+    };
 
     // Auto-replenish tasks (Infinite Generation)
     useEffect(() => {
@@ -166,13 +229,7 @@ export default function GrowthHubPage() {
     }, [tasks, accounts, clients, notes, growthTasks]); // Reacting to data changes to check criteria
 
     const playGenerationSound = () => {
-        try {
-            const audio = new Audio('/generations.mp3');
-            audio.volume = 0.5;
-            audio.play().catch(e => console.log('Audio play failed (interaction needed):', e));
-        } catch (e) {
-            console.error('Audio error:', e);
-        }
+        playSound('generations');
     };
 
     const generateTasks = async (countToGenerate: number = 4) => {
@@ -181,81 +238,133 @@ export default function GrowthHubPage() {
             // Artificial delay to feel like AI
             await new Promise(resolve => setTimeout(resolve, 1500));
             
+            // 1. Calculate Current Achievements
+            const completedTaskCount = tasks.filter(t => t.completed).length;
+            const currentNetWorth = accounts.reduce((sum, acc) => acc.type === 'credit' ? sum - acc.balance : sum + acc.balance, 0);
+            const clientCount = clients.length;
+            const noteCount = notes.length;
+
             const templates = [
                 {
                     baseTitle: "Task Warrior",
                     baseDesc: "Complete {target} tasks across all projects.",
                     category: 'productivity',
                     criteriaType: 'task_count',
-                    baseTarget: 5,
-                    xpPerUnit: 40,
+                    getTarget: (lvl: number) => {
+                        if (lvl < 50) return completedTaskCount + Math.max(1, Math.ceil(lvl * 0.2));
+                        const step = Math.max(1, Math.ceil(lvl * 1.5));
+                        return completedTaskCount + step;
+                    },
+                    xpPerUnit: 50,
                     path: '/tasks',
-                    icon: 'KanbanSquare'
-                },
-                {
-                    baseTitle: "Financial Milestone",
-                    baseDesc: "Reach a net worth of ${target}.",
-                    category: 'finance',
-                    criteriaType: 'net_worth',
-                    baseTarget: 5000,
-                    xpPerUnit: 0.1, // 500 XP for 5000
-                    path: '/budgeting',
-                    icon: 'DollarSign'
+                    icon: 'KanbanSquare',
+                    minLevel: 1
                 },
                 {
                     baseTitle: "Client Expansion",
                     baseDesc: "Add {target} new clients to your CRM.",
                     category: 'productivity',
                     criteriaType: 'client_count',
-                    baseTarget: 2,
-                    xpPerUnit: 175,
+                    getTarget: (lvl: number) => {
+                        if (lvl < 50) return clientCount + Math.max(1, Math.ceil(lvl * 0.05));
+                        const step = Math.ceil(lvl / 10) + 1;
+                        return clientCount + step;
+                    },
+                    xpPerUnit: 200,
                     path: '/clients',
-                    icon: 'Users'
+                    icon: 'Users',
+                    minLevel: 1
+                },
+                {
+                    baseTitle: "Knowledge Base",
+                    baseDesc: "Document {target} neural notes in your second brain.",
+                    category: 'learning',
+                    criteriaType: 'note_count',
+                    getTarget: (lvl: number) => {
+                        if (lvl < 50) return noteCount + Math.max(1, Math.ceil(lvl * 0.1));
+                        const step = Math.max(2, Math.ceil(lvl / 4));
+                        return noteCount + step;
+                    },
+                    xpPerUnit: 30,
+                    path: '/notes',
+                    icon: 'BookOpen',
+                    minLevel: 1
+                },
+                {
+                    baseTitle: "Financial Milestone",
+                    baseDesc: "Reach a net worth of ${target}.",
+                    category: 'finance',
+                    criteriaType: 'net_worth',
+                    getTarget: (lvl: number) => {
+                        // Starts after Level 30.
+                        const growthFactor = lvl < 50 ? 1 + (lvl * 0.001) : 1 + (lvl * 0.01);
+                        const addition = lvl < 50 ? lvl * 50 : lvl * 500;
+                        return Math.ceil(currentNetWorth * growthFactor + addition);
+                    },
+                    xpPerUnit: 0.15,
+                    path: '/budgeting',
+                    icon: 'DollarSign',
+                    minLevel: 30
                 }
             ];
+
+            // 2. Filter available templates based on Level
+            const availableTemplates = templates.filter(t => currentLevel >= t.minLevel);
 
             const newTasks: GrowthTask[] = [];
 
             for (let i = 0; i < countToGenerate; i++) {
-                // Pick a random template
-                const template = templates[Math.floor(Math.random() * templates.length)];
+                // Pick a random template from available ones
+                const template = availableTemplates[Math.floor(Math.random() * availableTemplates.length)];
                 
-                // Add some variance to target (0.8x to 1.5x)
-                const variance = 0.8 + Math.random() * 0.7; 
-                const target = Math.ceil(template.baseTarget * variance);
+                // Calculate target based on current stats and level
+                const target = template.getTarget(currentLevel);
                 
-                // Calculate XP based on target
-                const xp = Math.ceil(target * template.xpPerUnit);
+                // Variance for flavor (±10%)
+                const variance = 0.9 + Math.random() * 0.2;
+                const finalTarget = Math.max(1, Math.ceil(target * variance));
+
+                // Calculate base contribution (Target minus current)
+                let currentVal = 0;
+                if (template.criteriaType === 'task_count') currentVal = completedTaskCount;
+                else if (template.criteriaType === 'net_worth') currentVal = currentNetWorth;
+                else if (template.criteriaType === 'client_count') currentVal = clientCount;
+                else if (template.criteriaType === 'note_count') currentVal = noteCount;
+
+                const difficultyStep = finalTarget - currentVal;
+                
+                // Calculate XP based on difficulty step
+                const xp = Math.ceil(Math.max(50, difficultyStep * template.xpPerUnit));
                 
                 // Determine difficulty
                 let difficulty: 'easy' | 'medium' | 'hard' | 'expert' = 'medium';
-                if (xp < 100) difficulty = 'easy';
-                else if (xp > 400) difficulty = 'hard';
-                else if (xp > 800) difficulty = 'expert';
+                if (xp < 150) difficulty = 'easy';
+                else if (xp > 500) difficulty = 'hard';
+                else if (xp > 1000) difficulty = 'expert';
 
                 newTasks.push({
                     id: crypto.randomUUID(),
                     title: template.baseTitle,
-                    description: template.baseDesc.replace('{target}', target.toString()),
+                    description: template.baseDesc.replace('{target}', finalTarget.toLocaleString()),
                     xp: xp,
                     difficulty: difficulty,
                     status: 'pending',
                     category: template.category as any,
-                    criteria: { type: template.criteriaType as any, target: target },
+                    criteria: { type: template.criteriaType as any, target: finalTarget },
                     path: template.path,
                     icon: template.icon
                 });
             }
 
-            // Filter out exact duplicates (same title and target)
+            // Filter out exact duplicates
             const uniqueNewTasks = newTasks.filter(nt => !growthTasks.some(gt => gt.title === nt.title && gt.criteria?.target === nt.criteria?.target && gt.status === 'pending'));
 
             if (uniqueNewTasks.length > 0) {
                 setGrowthTasks(prev => [...prev, ...uniqueNewTasks]);
                 playGenerationSound();
                 toast({
-                    title: "AI Coach: New Tasks Generated",
-                    description: `I've analyzed your progress and created ${uniqueNewTasks.length} new challenges for you.`,
+                    title: "AI Coach: New Adapted Tasks",
+                    description: `Analyzing Level ${currentLevel} progress... Generated ${uniqueNewTasks.length} calibrated challenges.`,
                 });
             }
         } catch (error) {
@@ -293,7 +402,7 @@ export default function GrowthHubPage() {
     };
 
     return (
-        <div className="h-full flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full overflow-hidden">
+        <div className="h-full flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full overflow-y-auto">
             {/* Header Section */}
             <motion.div 
                 initial={{ opacity: 0, y: -20 }}
@@ -337,13 +446,13 @@ export default function GrowthHubPage() {
                 </div>
             </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 min-h-0">
                 {/* Left Column: Stats */}
                 <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="space-y-6 flex flex-col h-full overflow-hidden"
+                    className="space-y-6 flex flex-col min-h-0"
                 >
                     {/* Total XP Card (Renamed from Next Milestone) */}
                     <Card className="border-border/50 shadow-sm bg-gradient-to-br from-card to-muted/20">
@@ -422,9 +531,9 @@ export default function GrowthHubPage() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="md:col-span-2 h-full min-h-0 flex flex-col"
+                    className="md:col-span-2 min-h-0 flex flex-col"
                 >
-                    <Card className="h-full border-border/50 shadow-sm flex flex-col bg-card/50 backdrop-blur-sm">
+                    <Card className="min-h-[600px] border-border/50 shadow-sm flex flex-col bg-card/50 backdrop-blur-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-4">
                             <div>
                                 <CardTitle className="text-xl flex items-center gap-2">
@@ -448,7 +557,7 @@ export default function GrowthHubPage() {
                             )}
                         </CardHeader>
                         <CardContent className="flex-1 min-h-0 p-0">
-                            <ScrollArea className="h-full px-6 pb-6">
+                            <div className="px-6 pb-6">
                                 <motion.div 
                                     variants={containerVariants}
                                     initial="hidden"
@@ -532,25 +641,36 @@ export default function GrowthHubPage() {
                                                                     +{task.xp} XP
                                                                 </div>
                                                                 
-                                                                {task.path ? (
-                                                                    <Button 
-                                                                        size="sm" 
-                                                                        variant="ghost" 
-                                                                        className="text-xs text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all"
-                                                                    >
-                                                                        Go to Task <ArrowRight className="ml-1 h-3 w-3" />
-                                                                    </Button>
-                                                                ) : (
+                                                                <div className="flex flex-col gap-2">
+                                                                    {task.path ? (
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="ghost" 
+                                                                            className="text-xs text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all"
+                                                                        >
+                                                                            Go to Task <ArrowRight className="ml-1 h-3 w-3" />
+                                                                        </Button>
+                                                                    ) : (
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="ghost" 
+                                                                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+                                                                            onClick={(e) => handleManualComplete(e, task.id, task.xp)}
+                                                                        >
+                                                                            <CheckCircle className="h-4 w-4 mr-2" />
+                                                                            Mark Done
+                                                                        </Button>
+                                                                    )}
                                                                     <Button 
                                                                         size="sm" 
                                                                         variant="ghost" 
                                                                         className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
-                                                                        onClick={(e) => handleManualComplete(e, task.id, task.xp)}
+                                                                        onClick={(e) => { e.stopPropagation(); handleSkipWithAd(task); }}
                                                                     >
-                                                                        <CheckCircle className="h-4 w-4 mr-2" />
-                                                                        Mark Done
+                                                                        <Gem className="h-4 w-4 mr-2" />
+                                                                        Skip (Ad)
                                                                     </Button>
-                                                                )}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </motion.div>
@@ -567,6 +687,13 @@ export default function GrowthHubPage() {
                                                     <ContextMenuItem onClick={(e) => handleManualComplete(e, task.id, task.xp)}>
                                                         <CheckCircle className="mr-2 h-4 w-4" />
                                                         Complete Task
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem 
+                                                        onClick={() => handleSkipWithAd(task)}
+                                                        className="text-primary font-medium"
+                                                    >
+                                                        <Gem className="mr-2 h-4 w-4" />
+                                                        Skip Task (Watch Ad)
                                                     </ContextMenuItem>
                                                     <ContextMenuItem 
                                                         onClick={() => setGrowthTasks(prev => prev.filter(t => t.id !== task.id))}
@@ -589,11 +716,56 @@ export default function GrowthHubPage() {
                                         </div>
                                     )}
                                 </motion.div>
-                            </ScrollArea>
+                            </div>
                         </CardContent>
                     </Card>
                 </motion.div>
             </div>
+
+            {/* Rewarded Ad Modal */}
+            <Dialog open={adModalOpen} onOpenChange={open => !open && setAdModalOpen(false)}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Sponsor Ad</DialogTitle>
+                        <DialogDescription>
+                            Please view {adsRequired > 1 ? `${adsRequired} sponsor messages` : `this sponsor message`} to claim your reward (Skip Task +{adTask?.xp} XP).
+                            {adsRequired > 1 && <span className="block mt-1 font-semibold text-primary">Progress: {adsWatched} / {adsRequired} Ads Watched</span>}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 flex justify-center items-center min-h-[250px] bg-muted/50 rounded-md border text-muted-foreground uppercase text-sm relative overflow-hidden">
+                        {/* Display AdBanner */}
+                        <GoogleAdBanner 
+                           adSlot="9617260533" // REPLACEME: Replace with your actual Rewarded Ad Unit ID from AdSense
+                           adFormat="rectangle" 
+                           className="w-full h-full min-h-[250px] flex items-center justify-center bg-card shadow-inner" 
+                        />
+                        {/* Overlay to prevent accidental clicks from completely breaking the flow before timer */}
+                        {adTimeLeft > 0 && (
+                            <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-semibold px-2 py-1 rounded shadow">
+                                Ad closes in {adTimeLeft}s
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter className="flex items-center justify-between mt-2">
+                        <Button variant="ghost" onClick={() => setAdModalOpen(false)}>Cancel</Button>
+                        <Button 
+                           onClick={handleNextAd} 
+                           disabled={adTimeLeft > 0}
+                           className="gap-2"
+                        >
+                            {adTimeLeft > 0 ? (
+                                <>Please Wait...</>
+                            ) : (
+                                <>
+                                    <Gem className="h-4 w-4" />
+                                    {adsWatched + 1 >= adsRequired ? "Claim Reward" : "Next Ad"}
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }

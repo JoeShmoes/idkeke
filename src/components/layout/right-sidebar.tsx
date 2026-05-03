@@ -4,16 +4,17 @@
 import { useMemo } from 'react';
 import { useApp } from '@/components/layout/app-provider';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-    Landmark, Notebook, UserPlus, ClipboardCheck, Bell, AlertTriangle, 
-    Target, DollarSign, BookOpen, Network, Building, TrendingDown, 
+import {
+    Landmark, Notebook, UserPlus, ClipboardCheck, Bell, AlertTriangle,
+    Target, DollarSign, BookOpen, Network, Building, TrendingDown,
     Calendar, FileText, HeartPulse, Search, Award, X
 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback } from '../ui/avatar';
+import GoogleAdBanner from '../shared/google-ad-banner';
 import { formatDistanceToNow, isBefore, isToday, startOfToday, addDays, differenceInDays, isAfter } from 'date-fns';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../ui/resizable';
+
 
 interface ActivityItem {
     id: string;
@@ -25,41 +26,27 @@ interface ActivityItem {
     priority?: 'high' | 'medium' | 'low';
 }
 
-const Section = ({ title, children }: { title: string, children: React.ReactNode }) => {
-    return (
-        <div className="flex flex-col h-full min-w-0 overflow-hidden">
-            <div className="flex h-16 items-center px-3 border-b shrink-0 bg-background">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
-            </div>
-            <ScrollArea className="flex-1">
-                <div className="p-3 space-y-3">
-                    {children}
-                </div>
-            </ScrollArea>
-        </div>
-    )
-}
 
 export default function RightSidebar() {
-    const { 
+    const {
         projects, clients, transactions, networkContacts, appSettings, tasks,
         accounts, goals, learningResources, researchSessions, assets, toggleRightSidebar
     } = useApp();
 
     const activityFeed: ActivityItem[] = useMemo(() => {
         const today = startOfToday();
-        
+
         const getTimestampFromId = (id: string): string => {
             const timestamp = parseInt(id.split('-')[1]);
             return isNaN(timestamp) ? new Date().toISOString() : new Date(timestamp).toISOString();
         };
-        
+
         const projectActivities = Array.isArray(projects) ? projects.map(p => ({
             id: `proj-${p.id}`, type: 'Project' as const, icon: ClipboardCheck,
             title: `Project: ${p.name}`, description: `Status set to ${p.status}`,
             timestamp: getTimestampFromId(p.id)
         })) : [];
-        
+
         const clientActivities = Array.isArray(clients) ? clients.map(c => ({
             id: `client-${c.id}`, type: 'Client' as const, icon: UserPlus,
             title: `Client: ${c.name}`, description: `Added as a new ${c.status}`,
@@ -74,8 +61,8 @@ export default function RightSidebar() {
         })) : [];
 
         return [...projectActivities, ...clientActivities, ...transactionActivities]
-               .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-               .slice(0, 20);
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            .slice(0, 20);
 
     }, [projects, clients, transactions]);
 
@@ -98,8 +85,8 @@ export default function RightSidebar() {
                 const dueDate = t.dueDate ? new Date(t.dueDate) : today;
                 const overdue = isBefore(dueDate, today);
                 allNotifications.push({
-                    id: `task-notif-${t.id}`, 
-                    type: 'Notification' as const, 
+                    id: `task-notif-${t.id}`,
+                    type: 'Notification' as const,
                     icon: AlertTriangle,
                     title: `${overdue ? 'Overdue' : 'Due Today'}: ${t.name}`,
                     description: `Due ${formatDistanceToNow(dueDate, { addSuffix: true })}`,
@@ -114,7 +101,7 @@ export default function RightSidebar() {
             goals.filter(goal => (goal.status as any) !== 'completed').forEach(goal => {
                 const targetDate = new Date(goal.targetDate);
                 const daysUntil = differenceInDays(targetDate, today);
-                
+
                 if (daysUntil <= 7 && daysUntil >= 0) {
                     allNotifications.push({
                         id: `goal-notif-${goal.id}`,
@@ -163,7 +150,7 @@ export default function RightSidebar() {
                     // Check if project has been in progress for a while (using ID timestamp as proxy)
                     const projectDate = new Date(parseInt(project.id.split('-')[1]) || Date.now());
                     const daysInProgress = differenceInDays(today, projectDate);
-                    
+
                     if (daysInProgress >= 30) {
                         allNotifications.push({
                             id: `project-long-${project.id}`,
@@ -185,7 +172,7 @@ export default function RightSidebar() {
                 if (client.lastInteraction) {
                     const lastContact = new Date(client.lastInteraction);
                     const daysSinceContact = differenceInDays(today, lastContact);
-                    
+
                     if (daysSinceContact >= 14 && daysSinceContact <= 30) {
                         allNotifications.push({
                             id: `client-followup-${client.id}`,
@@ -207,7 +194,7 @@ export default function RightSidebar() {
                 if (contact.lastContacted) {
                     const lastContact = new Date(contact.lastContacted);
                     const daysSinceContact = differenceInDays(today, lastContact);
-                    
+
                     if (daysSinceContact >= 30 && daysSinceContact <= 60) {
                         allNotifications.push({
                             id: `network-followup-${contact.id}`,
@@ -250,7 +237,7 @@ export default function RightSidebar() {
                 })
                 .filter(t => Math.abs(t.amount) >= 1000)
                 .slice(0, 3);
-            
+
             recentTransactions.forEach(trans => {
                 allNotifications.push({
                     id: `trans-large-${trans.id}`,
@@ -272,7 +259,7 @@ export default function RightSidebar() {
                     return differenceInDays(today, sessionDate) <= 3;
                 })
                 .slice(0, 2);
-            
+
             recentSessions.forEach(session => {
                 allNotifications.push({
                     id: `research-recent-${session.id}`,
@@ -380,7 +367,7 @@ export default function RightSidebar() {
     };
 
     const ActivitySection = () => (
-         <>
+        <>
             {activityFeed.length > 0 ? activityFeed.map(item => (
                 <div key={item.id} className="flex items-start gap-3">
                     <div className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-full bg-secondary">
@@ -400,68 +387,70 @@ export default function RightSidebar() {
         </>
     );
 
-    const ContactsSection = () => (
-        <>
-            {networkContacts.length > 0 ? networkContacts.map(contact => (
-                <div key={contact.id} className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9 flex-shrink-0">
-                        <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{contact.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{contact.role}</p>
-                    </div>
-                </div>
-            )) : (
-                <div className="text-center text-muted-foreground py-6 text-sm">
-                    No contacts found.
-                </div>
-            )}
-        </>
-    );
+
 
     // Alfred pinned chat removed
 
-    const panels = {
-        notifications: <Section title="Notifications"><NotificationsSection /></Section>,
-        contacts: <Section title="Contacts"><ContactsSection /></Section>,
-        activities: <Section title="Activity"><ActivitySection /></Section>,
-    };
+    const SponsoredSection = () => (
+        <div className="flex flex-col w-full max-w-full border rounded-lg bg-card/50 overflow-hidden shadow-sm">
+            <div className="w-full bg-muted/30 px-3 py-1.5 flex items-center justify-between border-b border-border/50">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold z-10">Advertisement</span>
+            </div>
+            <div className="w-full min-h-[250px] flex items-center justify-center p-2 max-w-full overflow-hidden">
+                <GoogleAdBanner 
+                    adSlot="right-sidebar-ad-slot" 
+                    adFormat="vertical" 
+                    fullWidthResponsive={false}
+                    className="w-full h-full flex items-center justify-center max-w-full" 
+                />
+            </div>
+        </div>
+    );
 
-    if (!appSettings.rightSidebar.isOpen) {
+    if (!appSettings?.rightSidebar?.isOpen) {
         return null;
     }
-
-    // A simple implementation of the order. A more robust one might involve drag-and-drop reordering.
-    const orderedPanels = appSettings.rightSidebar.order.map(key => ({ key, component: panels[key as keyof typeof panels] }));
-
 
     return (
         <div className="flex flex-col h-full border-l bg-background overflow-hidden">
             <div className="h-16 flex items-center justify-between px-4 border-b flex-shrink-0">
                 <h2 className="text-base font-semibold">Activity & Updates</h2>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="md:hidden h-8 w-8" 
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden h-8 w-8"
                     onClick={toggleRightSidebar}
                 >
                     <X className="h-4 w-4" />
                 </Button>
             </div>
-            <ResizablePanelGroup direction="vertical" className="flex-1 overflow-hidden">
-                <ResizablePanel defaultSize={33}>
-                    {orderedPanels[0]?.component || <div/>}
-                </ResizablePanel>
-                <ResizableHandle />
-                <ResizablePanel defaultSize={34}>
-                    {orderedPanels[1]?.component || <div/>}
-                </ResizablePanel>
-                <ResizableHandle />
-                <ResizablePanel defaultSize={33}>
-                    {orderedPanels[2] ? orderedPanels[2].component : panels.activities}
-                </ResizablePanel>
-            </ResizablePanelGroup>
+            
+            <ScrollArea className="flex-1">
+                <div className="p-4 space-y-8">
+                    {/* Notifications */}
+                    <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">Notifications</h3>
+                        <div className="space-y-4">
+                            <NotificationsSection />
+                        </div>
+                    </div>
+                    
+                    <Separator />
+                    
+                    {/* Recent Activity */}
+                    <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">Recent Activity</h3>
+                        <div className="space-y-4">
+                            <ActivitySection />
+                        </div>
+                    </div>
+                </div>
+            </ScrollArea>
+
+            {/* Fixed Ad Section */}
+            <div className="shrink-0 p-4 border-t bg-muted/10">
+                <SponsoredSection />
+            </div>
         </div>
     )
 }

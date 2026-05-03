@@ -1,12 +1,4 @@
-
 import { useState, useEffect, useCallback } from 'react';
-
-const getScopedKey = (baseKey: string) => {
-  if (typeof window === 'undefined') return null;
-  const WORKSPACE_KEY_HOLDER = 'contextflow-workspace-key'; // Consider moving this to a config file
-  const workspaceKey = localStorage.getItem(WORKSPACE_KEY_HOLDER);
-  return workspaceKey ? `${workspaceKey}_${baseKey}` : baseKey; // Fallback to baseKey if no workspace
-};
 
 export function useSafeLocalStorage<T>(
   key: string,
@@ -15,40 +7,49 @@ export function useSafeLocalStorage<T>(
   const [value, setValue] = useState<T>(defaultValue);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // This effect handles the initial loading of data from localStorage
   useEffect(() => {
-    // This effect runs only on the client, after the component has mounted.
-    const scopedKey = getScopedKey(key);
-    if (!scopedKey) {
+    if (typeof window === 'undefined' || !key) {
       setIsLoaded(true);
       return;
     }
 
     try {
-      const item = window.localStorage.getItem(scopedKey);
+      const item = window.localStorage.getItem(key);
       if (item) {
-        setValue(JSON.parse(item));
+        const parsed = JSON.parse(item);
+        if (
+          typeof parsed === 'object' && parsed !== null && 
+          typeof defaultValue === 'object' && defaultValue !== null && 
+          !Array.isArray(defaultValue)
+        ) {
+          setValue({ ...defaultValue, ...parsed });
+        } else {
+          setValue(parsed);
+        }
       }
     } catch (error) {
-      console.error(`Error reading localStorage key "${scopedKey}":`, error);
+      console.error(`Error reading localStorage key "${key}":`, error);
     } finally {
       setIsLoaded(true);
     }
   }, [key]);
 
-  const setValueAndStore = useCallback((newValue: T | ((prevState: T) => T)) => {
-    const scopedKey = getScopedKey(key);
-    if (!scopedKey) return;
-
-    try {
-      const valueToStore = newValue instanceof Function ? newValue(value) : newValue;
-      setValue(valueToStore);
-      window.localStorage.setItem(scopedKey, JSON.stringify(valueToStore));
-    } catch (error) {
-      console.error(`Error setting localStorage key "${scopedKey}":`, error);
-      // Optional: Dispatch a custom event so the UI can react to storage errors
-      window.dispatchEvent(new CustomEvent('local-storage-error', { detail: { key: scopedKey, error } }));
+  // This effect synchronizes the state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && key && isLoaded) {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      } catch (error) {
+        console.error(`Error writing to localStorage key "${key}":`, error);
+        window.dispatchEvent(new CustomEvent('local-storage-error', { detail: { key, error } }));
+      }
     }
-  }, [key, value]);
+  }, [key, value, isLoaded]);
+
+  const setValueAndStore = useCallback((newValue: T | ((prevState: T) => T)) => {
+    setValue(newValue);
+  }, []);
 
   return [value, setValueAndStore as React.Dispatch<React.SetStateAction<T>>, isLoaded];
 }

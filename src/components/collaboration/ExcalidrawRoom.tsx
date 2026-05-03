@@ -14,7 +14,7 @@ import { ExcalidrawImperativeAPI, ExcalidrawElement, AppState, BinaryFiles } fro
 import { RoomStorage, ExcalidrawRoom } from './storage';
 import { useToast } from '@/hooks/use-toast';
 import { useApp } from '@/components/layout/app-provider';
-import { Loader2, Users, Send, Grid as GridIcon, FolderOpen, LayoutGrid, Link as LinkIcon, Youtube, Download, Check, AlertCircle, Bot } from 'lucide-react';
+import { Loader2, Users, Send, Grid as GridIcon, FolderOpen, LayoutGrid, Link as LinkIcon, Youtube, Download, Check, AlertCircle, Bot, MessageSquareWarning } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
@@ -227,167 +227,168 @@ export default function ExcalidrawRoom({ roomId, isGuest = false }: ExcalidrawRo
 
     // Load from Supabase
     const loadBoard = async () => {
-      if (!roomData) setIsLoading(true);
-      
-      const { data, error } = await supabase.from("boards").select("*").eq("id", roomId).single();
-      
-      if (error) {
-        // Ignore "Row not found" errors (PGRST116) as we have a fallback
-        if (error.code !== 'PGRST116') {
-            console.error("Error loading board:", JSON.stringify(error, null, 2));
+      try {
+        if (!roomData) setIsLoading(true);
+        
+        const { data, error } = await supabase.from("boards").select("*").eq("id", roomId).single();
+        
+        if (error) {
+          // Ignore "Row not found" errors (PGRST116) as we have a fallback
+              console.error("Error loading board from Supabase:", error.message || error);
+          // If RLS denies access, we might get a specific error code (e.g. 42501)
         }
-        // If RLS denies access, we might get a specific error code (e.g. 42501)
-      }
 
-      if (data) {
-          let resolvedName = data.name as string | null;
+        if (data) {
+            let resolvedName = data.name as string | null;
 
-          if (!resolvedName) {
-              const ctxRoom = rooms.find(r => r.id === data.id);
-              if (ctxRoom) {
-                  resolvedName = ctxRoom.name;
-              } else {
-                  const storedRoom = RoomStorage.getRoom(data.id);
-                  if (storedRoom) resolvedName = storedRoom.name;
-              }
-          }
-
-          if (!resolvedName) {
-              resolvedName = 'Untitled';
-          }
-
-          // Extract files from app_state if present (hack to support files without schema change)
-          const rawAppState = data.app_state || { viewBackgroundColor: themeColor, theme: excalidrawTheme };
-          const storedFiles = rawAppState.files || {};
-          // Clean files from appState to avoid pollution
-          if (rawAppState.files) {
-              delete rawAppState.files;
-          }
-
-          let finalElements = data.elements || [];
-          let finalFiles = storedFiles;
-
-          // Merge with LocalStorage to prevent wiping unsynced offline work when reloading
-          const localRoom = RoomStorage.getRoom(data.id);
-          if (localRoom && localRoom.elements) {
-              finalElements = mergeExcalidrawElements(localRoom.elements, finalElements);
-              finalFiles = { ...finalFiles, ...(localRoom.files || {}) };
-          }
-
-          const loadedRoom: ExcalidrawRoom = {
-              id: data.id,
-              name: resolvedName,
-              createdAt: data.created_at,
-              updatedAt: new Date().toISOString(),
-              elements: finalElements,
-              appState: rawAppState,
-              files: finalFiles
-          };
-          setRoomData(loadedRoom);
-          
-          if (!data.name && resolvedName) {
-              await supabase.from("boards").update({ name: resolvedName }).eq("id", data.id);
-          }
-
-          if (excalidrawAPI) {
-             const sanitizedAppState = { ...loadedRoom.appState, theme: excalidrawTheme };
-             if (sanitizedAppState.collaborators && !(sanitizedAppState.collaborators instanceof Map)) {
-                 sanitizedAppState.collaborators = new Map();
-             }
-
-             // Load files if they exist
-             if (loadedRoom.files && Object.keys(loadedRoom.files).length > 0) {
-                 excalidrawAPI.addFiles(Object.values(loadedRoom.files));
-             }
-
-             excalidrawAPI.updateScene({
-                 elements: loadedRoom.elements,
-                 appState: sanitizedAppState
-             });
-          }
-      } else {
-          if (error) console.warn("Board not found in Supabase, checking local storage...", error);
-          
-          // Check LocalStorage Fallback
-          const localRoom = RoomStorage.getRoom(roomId);
-          
-          if (localRoom) {
-              console.log("Found in LocalStorage, attempting migration...");
-               try {
-                   // Attempt Migration to Supabase
-                   // Use upsert to prevent unique constraint errors
-                   // Include files in app_state for migration
-                   const appStateWithFiles = { ...localRoom.appState, files: localRoom.files };
-
-                   const { error: insertError } = await supabase.from('boards').upsert([
-                       { 
-                           id: localRoom.id,
-                           name: localRoom.name,
-                           elements: localRoom.elements,
-                           app_state: appStateWithFiles,
-                           created_at: localRoom.createdAt
-                       }
-                   ]).select();
-                   
-                   if (!insertError) {
-                       console.log("Migration successful!");
-                       setRoomData(localRoom);
-                   } else {
-                       throw insertError;
-                   }
-               } catch (migrateError: any) {
-                    // Fallback for Schema Mismatch (PGRST204)
-                    // If 'name' column is missing/stale in schema cache, try saving without it
-                    if (migrateError?.code === 'PGRST204' && migrateError?.message?.includes("'name' column")) {
-                        console.warn("Schema mismatch detected (missing 'name' column). Retrying migration without 'name' field...");
-                        const appStateWithFiles = { ...localRoom.appState, files: localRoom.files };
-                        const { error: retryError } = await supabase.from('boards').upsert([
-                            { 
-                                id: localRoom.id,
-                                // name: localRoom.name, // Omitted
-                                elements: localRoom.elements,
-                                app_state: appStateWithFiles,
-                                created_at: localRoom.createdAt
-                            }
-                        ]).select();
-
-                        if (!retryError) {
-                            console.log("Migration successful (without name)!");
-                            setRoomData(localRoom);
-                            // Success - stay online
-                            return;
-                        }
-                    }
-
-                    // If migration fails, we STILL load the local data so the user can work
-                    // We just flag it as offline mode
-                    console.error("Migration failed, falling back to offline mode", JSON.stringify(migrateError, null, 2));
-                    setRoomData(localRoom);
-                    setIsOfflineMode(true);
+            if (!resolvedName) {
+                const ctxRoom = rooms.find(r => r.id === data.id);
+                if (ctxRoom) {
+                    resolvedName = ctxRoom.name;
+                } else {
+                    const storedRoom = RoomStorage.getRoom(data.id);
+                    if (storedRoom) resolvedName = storedRoom.name;
                 }
-              
-              if (excalidrawAPI) {
-                 // Ensure collaborators is a valid Map
-                 const sanitizedAppState = { ...localRoom.appState, theme: excalidrawTheme };
-                 if (sanitizedAppState.collaborators && !(sanitizedAppState.collaborators instanceof Map)) {
-                     sanitizedAppState.collaborators = new Map();
-                 }
+            }
 
-                 if (localRoom.files && Object.keys(localRoom.files).length > 0) {
-                     excalidrawAPI.addFiles(Object.values(localRoom.files));
-                 }
+            if (!resolvedName) {
+                resolvedName = 'Untitled';
+            }
 
-                 excalidrawAPI.updateScene({
-                     elements: localRoom.elements,
-                     appState: sanitizedAppState
-                 });
-              }
-          } else {
-              console.error("Error loading board:", error);
-              setRoomData(null);
-          }
+            // Extract files from app_state if present (hack to support files without schema change)
+            const rawAppState = data.app_state || { viewBackgroundColor: themeColor, theme: excalidrawTheme };
+            const storedFiles = rawAppState.files || {};
+            // Clean files from appState to avoid pollution
+            if (rawAppState.files) {
+                delete rawAppState.files;
+            }
+
+            let finalElements = data.elements || [];
+            let finalFiles = storedFiles;
+
+            // Merge with LocalStorage to prevent wiping unsynced offline work when reloading
+            const localRoom = RoomStorage.getRoom(data.id);
+            if (localRoom && localRoom.elements) {
+                finalElements = mergeExcalidrawElements(localRoom.elements, finalElements);
+                finalFiles = { ...finalFiles, ...(localRoom.files || {}) };
+            }
+
+            const loadedRoom: ExcalidrawRoom = {
+                id: data.id,
+                name: resolvedName,
+                createdAt: data.created_at,
+                updatedAt: new Date().toISOString(),
+                elements: finalElements,
+                appState: rawAppState,
+                files: finalFiles
+            };
+            setRoomData(loadedRoom);
+            
+            if (!data.name && resolvedName) {
+                await supabase.from("boards").update({ name: resolvedName }).eq("id", data.id);
+            }
+
+            if (excalidrawAPI) {
+               const sanitizedAppState = { ...loadedRoom.appState, theme: excalidrawTheme };
+               if (sanitizedAppState.collaborators && !(sanitizedAppState.collaborators instanceof Map)) {
+                   sanitizedAppState.collaborators = new Map();
+               }
+
+               // Load files if they exist
+               if (loadedRoom.files && Object.keys(loadedRoom.files).length > 0) {
+                   excalidrawAPI.addFiles(Object.values(loadedRoom.files));
+               }
+
+               excalidrawAPI.updateScene({
+                   elements: loadedRoom.elements,
+                   appState: sanitizedAppState
+               });
+            }
+        } else {
+            if (error) console.warn("Board not found in Supabase, checking local storage fallbacks...");
+            
+            // Check LocalStorage Fallback
+            const localRoom = RoomStorage.getRoom(roomId);
+            
+            if (localRoom) {
+                console.log("Found in LocalStorage, attempting background sync/migration...");
+                 try {
+                     // Attempt Migration to Supabase
+                     // Use upsert to prevent unique constraint errors
+                     // Include files in app_state for migration
+                     const appStateWithFiles = { ...localRoom.appState, files: localRoom.files };
+
+                     const { error: insertError } = await supabase.from('boards').upsert([
+                         { 
+                             id: localRoom.id,
+                             name: localRoom.name,
+                             elements: localRoom.elements,
+                             app_state: appStateWithFiles,
+                             created_at: localRoom.createdAt
+                         }
+                     ]).select();
+                     
+                     if (!insertError) {
+                         console.log("Migration successful!");
+                         setRoomData(localRoom);
+                     } else {
+                         throw insertError;
+                     }
+                 } catch (migrateError: any) {
+                      // Fallback for Schema Mismatch (PGRST204)
+                      // If 'name' column is missing/stale in schema cache, try saving without it
+                      if (migrateError?.code === 'PGRST204' && migrateError?.message?.includes("'name' column")) {
+                          console.warn("Schema mismatch detected (missing 'name' column). Retrying without 'name' field...");
+                          const appStateWithFiles = { ...localRoom.appState, files: localRoom.files };
+                          const { error: retryError } = await supabase.from('boards').upsert([
+                              { 
+                                  id: localRoom.id,
+                                  // name: localRoom.name, // Omitted
+                                  elements: localRoom.elements,
+                                  app_state: appStateWithFiles,
+                                  created_at: localRoom.createdAt
+                              }
+                          ]).select();
+
+                          if (!retryError) {
+                              console.log("Migration successful (without name field)!");
+                              setRoomData(localRoom);
+                          }
+                      } else {
+                          // Generic Migration Error
+                          console.error("Board sync failed, staying in local/offline mode:", migrateError.message || migrateError);
+                          setRoomData(localRoom);
+                          setIsOfflineMode(true);
+                      }
+                  }
+                
+                if (excalidrawAPI) {
+                   // Ensure collaborators is a valid Map
+                   const sanitizedAppState = { ...localRoom.appState, theme: excalidrawTheme };
+                   if (sanitizedAppState.collaborators && !(sanitizedAppState.collaborators instanceof Map)) {
+                       sanitizedAppState.collaborators = new Map();
+                   }
+
+                   if (localRoom.files && Object.keys(localRoom.files).length > 0) {
+                       excalidrawAPI.addFiles(Object.values(localRoom.files));
+                   }
+
+                   excalidrawAPI.updateScene({
+                       elements: localRoom.elements,
+                       appState: sanitizedAppState
+                   });
+                }
+            } else {
+                console.error("Fatal Error: Board not found in any storage.");
+                setRoomData(null);
+            }
+        }
+      } catch (fatalError: any) {
+          console.error("Critical Room Loading Error:", fatalError.message || fatalError);
+          setRoomData(null);
+      } finally {
+          setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     if (!roomId) return;

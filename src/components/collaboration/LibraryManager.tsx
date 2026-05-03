@@ -187,52 +187,75 @@ export function LibraryManager({ excalidrawAPI, onLibraryChangeRequest, currentI
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      try {
-        const content = ev.target?.result as string;
-        const data = JSON.parse(content);
+    const fileArray = Array.from(files);
+    
+    const packPromises = fileArray.map(file => {
+        return new Promise<InstalledPack | null>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                try {
+                    const content = ev.target?.result as string;
+                    const data = JSON.parse(content);
+                    
+                    let items: LibraryItem[] = [];
+                    if (data.libraryItems) items = data.libraryItems;
+                    else if (Array.isArray(data)) items = data;
+
+                    // Ensure IDs
+                    items = items.map(item => ({
+                        ...item,
+                        id: item.id || crypto.randomUUID(),
+                        status: "published",
+                        created: Date.now()
+                    }));
+
+                    const newPack: InstalledPack = {
+                        id: crypto.randomUUID(),
+                        name: file.name.replace('.excalidrawlib', '').replace('.json', ''),
+                        items: items,
+                        isCustom: true
+                    };
+
+                    resolve(newPack);
+                } catch (err) {
+                    toast({ title: `Invalid format in ${file.name}`, variant: "destructive" });
+                    resolve(null);
+                }
+            };
+            reader.onerror = () => resolve(null);
+            reader.readAsText(file);
+        });
+    });
+
+    try {
+        const results = await Promise.all(packPromises);
+        const successfulPacks = results.filter((p): p is InstalledPack => p !== null);
         
-        let items: LibraryItem[] = [];
-        if (data.libraryItems) items = data.libraryItems;
-        else if (Array.isArray(data)) items = data;
+        if (successfulPacks.length > 0) {
+            setInstalledPacks(prev => [...prev, ...successfulPacks]);
 
-         // Ensure IDs
-         items = items.map(item => ({
-            ...item,
-            id: item.id || crypto.randomUUID(),
-            status: "published",
-            created: Date.now()
-          }));
-
-        const newPack: InstalledPack = {
-          id: crypto.randomUUID(),
-          name: file.name.replace('.excalidrawlib', '').replace('.json', ''),
-          items: items,
-          isCustom: true
-        };
-
-        setInstalledPacks(prev => [...prev, newPack]);
-
-        if (excalidrawAPI) {
-            const allItems = [...currentItems, ...items];
-            const uniqueItems = Array.from(new Map(allItems.map(item => [item.id, item])).values());
+            if (excalidrawAPI) {
+                const allNewItems = successfulPacks.flatMap(p => p.items);
+                const allItems = [...currentItems, ...allNewItems];
+                const uniqueItems = Array.from(new Map(allItems.map(item => [item.id, item])).values());
+                
+                excalidrawAPI.updateLibrary({
+                    libraryItems: uniqueItems
+                });
+            }
             
-            excalidrawAPI.updateLibrary({
-                libraryItems: uniqueItems
-            });
+            toast({ title: `${successfulPacks.length} libraries added` });
         }
-        
-        toast({ title: "Custom library added" });
-      } catch (err) {
-        toast({ title: "Invalid file format", variant: "destructive" });
-      }
-    };
-    reader.readAsText(file);
+    } catch (err) {
+        console.error("Batch library import failed:", err);
+    }
+
+    // Reset input
+    e.target.value = '';
   };
 
   const filteredLibs = externalLibs.filter(lib => 
@@ -373,6 +396,7 @@ export function LibraryManager({ excalidrawAPI, onLibraryChangeRequest, currentI
                     <Button>Choose File</Button>
                     <Input 
                         type="file" 
+                        multiple
                         accept=".json,.excalidrawlib"
                         className="absolute inset-0 opacity-0 cursor-pointer"
                         onChange={handleFileUpload}

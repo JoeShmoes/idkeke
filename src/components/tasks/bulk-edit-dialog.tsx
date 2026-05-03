@@ -60,52 +60,59 @@ export default function BulkEditDialog({ isOpen, onOpenChange, onBulkUpdate, sel
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                    <DialogTitle>Bulk Edit Tasks</DialogTitle>
-                    <DialogDescription>
-                        Update {selectedCount} selected tasks.
+            <DialogContent className="max-w-[90vw] w-[440px] max-h-[calc(100dvh-50px)] rounded-[48px] px-6 pt-10 pb-8 sm:px-8 sm:pt-12 sm:pb-10 border border-white/10 bg-[#0F0F0F] text-white shadow-2xl flex flex-col gap-6 sm:gap-8 overflow-hidden z-[300]">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-16 h-1.5 rounded-full bg-white/10" />
+                
+                <DialogHeader className="text-left space-y-1">
+                    <DialogTitle className="text-2xl sm:text-4xl font-black italic uppercase tracking-tighter text-white">
+                        Bulk Edit
+                    </DialogTitle>
+                    <DialogDescription className="text-[10px] font-bold opacity-40 uppercase tracking-[0.2em] text-white/60">
+                        Managing {selectedCount} items
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="status" className="text-right">Status</Label>
+
+                <div className="space-y-6 sm:space-y-8 py-4 overflow-y-auto pr-2 scrollbar-none">
+                    <div className="space-y-4">
+                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ml-2">Status Update</Label>
                         <Select value={status} onValueChange={(v: any) => setStatus(v)}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger className="h-14 sm:h-16 rounded-[28px] bg-white/5 border-none px-6 font-bold text-white transition-all hover:bg-white/10">
                                 <SelectValue placeholder="No Change" />
                             </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="no-change">No Change</SelectItem>
-                                <SelectItem value="completed">Mark as Completed</SelectItem>
-                                <SelectItem value="incomplete">Mark as Incomplete</SelectItem>
+                            <SelectContent className="rounded-[32px] border-white/10 bg-[#1A1A1A] text-white">
+                                <SelectItem value="no-change" className="rounded-2xl py-4">No Change</SelectItem>
+                                <SelectItem value="completed" className="rounded-2xl py-4">Mark as Completed</SelectItem>
+                                <SelectItem value="incomplete" className="rounded-2xl py-4">Mark as Incomplete</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="group" className="text-right">Group</Label>
+
+                    <div className="space-y-4">
+                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ml-2">Relocate Group</Label>
                         <Select value={groupId} onValueChange={setGroupId}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger className="h-14 sm:h-16 rounded-[28px] bg-white/5 border-none px-6 font-bold text-white transition-all hover:bg-white/10">
                                 <SelectValue placeholder="No Change" />
                             </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="no-change">No Change</SelectItem>
+                            <SelectContent className="rounded-[32px] border-white/10 bg-[#1A1A1A] text-white">
+                                <SelectItem value="no-change" className="rounded-2xl py-4">No Change</SelectItem>
                                 {groups.map(group => (
-                                    <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                                    <SelectItem key={group.id} value={group.id} className="rounded-2xl py-4">{group.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="dueDate" className="text-right">Due Date</Label>
-                        <div className="col-span-3 space-y-2">
+
+                    <div className="space-y-4">
+                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 ml-2">Timeline Action</Label>
+                        <div className="space-y-4">
                             <Select value={dueDateAction} onValueChange={(v: any) => setDueDateAction(v)}>
-                                <SelectTrigger>
+                                <SelectTrigger className="h-14 sm:h-16 rounded-[28px] bg-white/5 border-none px-6 font-bold text-white transition-all hover:bg-white/10">
                                     <SelectValue placeholder="No Change" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="no-change">No Change</SelectItem>
-                                    <SelectItem value="set">Set Date</SelectItem>
-                                    <SelectItem value="clear">Clear Date</SelectItem>
+                                <SelectContent className="rounded-[32px] border-white/10 bg-[#1A1A1A] text-white">
+                                    <SelectItem value="no-change" className="rounded-2xl py-4">No Change</SelectItem>
+                                    <SelectItem value="set" className="rounded-2xl py-4">Set Date</SelectItem>
+                                    <SelectItem value="clear" className="rounded-2xl py-4 text-destructive">Clear Date</SelectItem>
                                 </SelectContent>
                             </Select>
                             {dueDateAction === 'set' && (
@@ -114,20 +121,21 @@ export default function BulkEditDialog({ isOpen, onOpenChange, onBulkUpdate, sel
                                         <Button
                                             variant={"outline"}
                                             className={cn(
-                                                "w-full justify-start text-left font-normal",
-                                                !dueDate && "text-muted-foreground"
+                                                "h-14 sm:h-16 w-full rounded-[28px] bg-indigo-500/10 border-indigo-500/20 px-6 flex items-center justify-between font-bold text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all",
+                                                !dueDate && "opacity-40"
                                             )}
                                         >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
                                             {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                                            <CalendarIcon className="h-5 w-5 opacity-40" />
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
+                                    <PopoverContent className="w-auto p-0 rounded-[40px] overflow-hidden border-white/10 bg-[#1A1A1A] shadow-2xl" align="center">
                                         <Calendar
                                             mode="single"
                                             selected={dueDate}
                                             onSelect={setDueDate}
                                             initialFocus
+                                            className="p-6 bg-[#1A1A1A] text-white"
                                         />
                                     </PopoverContent>
                                 </Popover>
@@ -135,9 +143,14 @@ export default function BulkEditDialog({ isOpen, onOpenChange, onBulkUpdate, sel
                         </div>
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Update Tasks</Button>
+
+                <DialogFooter className="pt-4 sm:pt-6 gap-4 sm:flex-row flex-col">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-16 sm:h-20 flex-1 rounded-[32px] font-bold text-white/40 hover:text-white hover:bg-white/5">
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSubmit} className="h-16 sm:h-20 flex-[2.5] rounded-[32px] font-black uppercase tracking-[0.2em] bg-indigo-500 hover:bg-indigo-600 text-white shadow-2xl shadow-indigo-500/30 gap-3 active:scale-95 transition-transform">
+                        Commit Changes
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

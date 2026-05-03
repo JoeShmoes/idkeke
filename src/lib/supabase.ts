@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -13,7 +13,7 @@ const supabaseAnonKey =
 const configured = Boolean(supabaseUrl && supabaseAnonKey);
 
 export const supabase = configured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createBrowserClient(supabaseUrl, supabaseAnonKey)
   : ({
       auth: {
         async getUser() {
@@ -42,6 +42,9 @@ export const supabase = configured
             'Supabase configuration missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
           );
           return { data: null, error };
+        },
+        async signOut() {
+          return { error: null };
         },
       },
       from() {

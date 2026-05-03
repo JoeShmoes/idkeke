@@ -18,7 +18,7 @@ const RANKS = [
     { threshold: 100, title: 'Legend', icon: Crown, color: 'text-yellow-500' },
 ];
 
-export default function LevelBar() {
+export default function LevelBar({ compact = false }: { compact?: boolean }) {
   const { currentLevel, totalPoints, progressToNextLevel, pointsForNextLevel, xpInCurrentLevel, xpRequiredForNextLevel } = useLevel();
   const [previousLevel, setPreviousLevel] = useState(1);
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -43,17 +43,22 @@ export default function LevelBar() {
         <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
                 <motion.div 
-                    className="flex items-center gap-2 bg-background/30 backdrop-blur-sm px-2 py-0.5 rounded-full border border-border/30 hover:bg-accent/50 transition-all cursor-pointer group relative overflow-hidden"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    className={cn(
+                        "flex items-center gap-2 bg-background/30 backdrop-blur-sm px-2 py-0.5 rounded-full border border-border/30 hover:bg-accent/50 transition-all cursor-pointer group relative overflow-hidden",
+                        compact && "px-1.5 py-1.5"
+                    )}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                 >
                     {/* Background Progress Fill (Subtle) */}
-                    <div 
-                        className="absolute inset-0 bg-primary/5 origin-left transition-transform duration-500 ease-out" 
-                        style={{ transform: `scaleX(${progressToNextLevel / 100})` }}
-                    />
+                    {!compact && (
+                        <div 
+                            className="absolute inset-0 bg-primary/5 origin-left transition-transform duration-500 ease-out" 
+                            style={{ transform: `scaleX(${progressToNextLevel / 100})` }}
+                        />
+                    )}
 
-                    <div className="flex items-center gap-2 relative z-10">
+                    <div className={cn("flex items-center relative z-10", compact ? "gap-0" : "gap-2")}>
                         <div className={cn(
                             "flex items-center justify-center h-5 w-5 rounded-full shadow-sm border border-border/50 bg-gradient-to-br from-background to-muted text-[10px] font-bold text-foreground",
                             currentRank.color.replace('text-', 'border-').replace('500', '200')
@@ -61,23 +66,27 @@ export default function LevelBar() {
                             {currentLevel}
                         </div>
                         
-                        <div className="flex flex-col gap-0.5">
-                            <div className="h-1 w-20 bg-muted/50 rounded-full overflow-hidden">
-                                <motion.div 
-                                    className={cn(
-                                        "h-full shadow-[0_0_10px_rgba(var(--primary),0.5)]",
-                                        "bg-gradient-to-r from-primary/80 to-primary" 
-                                    )}
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${progressToNextLevel}%` }}
-                                    transition={{ type: "spring", stiffness: 50, damping: 15 }}
-                                />
+                        {!compact && (
+                            <div className="flex flex-col gap-0.5">
+                                <div className="h-1 w-20 bg-muted/50 rounded-full overflow-hidden">
+                                    <motion.div 
+                                        className={cn(
+                                            "h-full shadow-[0_0_10px_rgba(var(--primary),0.5)]",
+                                            "bg-gradient-to-r from-primary/80 to-primary" 
+                                        )}
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${progressToNextLevel}%` }}
+                                        transition={{ type: "spring", stiffness: 50, damping: 15 }}
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
 
-                        <span className="text-[10px] font-medium text-muted-foreground tabular-nums relative z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 w-0 group-hover:w-auto overflow-hidden whitespace-nowrap">
-                            {Math.floor(progressToNextLevel)}%
-                        </span>
+                        {!compact && (
+                            <span className="text-[10px] font-medium text-muted-foreground tabular-nums relative z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 w-0 group-hover:w-auto overflow-hidden whitespace-nowrap">
+                                {Math.floor(progressToNextLevel)}%
+                            </span>
+                        )}
                     </div>
                 </motion.div>
             </TooltipTrigger>

@@ -142,7 +142,7 @@ export default function FileVaultPage() {
     const fileArray = Array.from(files);
     
     const uploadPromises = fileArray.map((file, i) => {
-      return new Promise<void>((resolve) => {
+      return new Promise<VaultFile | null>(async (resolve) => {
         const fileId = `${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
         const reader = new FileReader();
 
@@ -170,13 +170,12 @@ export default function FileVaultPage() {
               starred: false,
             };
             
-            setVaultFiles(prev => [...prev, newFile]);
             setUploadProgress(prev => {
               const newProgress = { ...prev };
               delete newProgress[fileId];
               return newProgress;
             });
-            resolve();
+            resolve(newFile);
           } catch (error) {
             console.error(`Failed to save file ${file.name} to IndexedDB`, error);
             setUploadProgress(prev => {
@@ -184,7 +183,7 @@ export default function FileVaultPage() {
               delete newProgress[fileId];
               return newProgress;
             });
-            resolve();
+            resolve(null);
           }
         };
 
@@ -195,7 +194,7 @@ export default function FileVaultPage() {
             delete newProgress[fileId];
             return newProgress;
           });
-          resolve();
+          resolve(null);
         };
 
         reader.readAsDataURL(file);
@@ -203,7 +202,11 @@ export default function FileVaultPage() {
     });
 
     try {
-      await Promise.all(uploadPromises);
+      const results = await Promise.all(uploadPromises);
+      const successfulFiles = results.filter((f): f is VaultFile => f !== null);
+      if (successfulFiles.length > 0) {
+        setVaultFiles(prev => [...prev, ...successfulFiles]);
+      }
     } catch (error) {
       console.error("Error uploading files:", error);
     } finally {

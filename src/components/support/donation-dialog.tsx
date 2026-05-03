@@ -2,13 +2,12 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import GoogleAdBanner from '@/components/shared/google-ad-banner';
 
 const HIDE_KEY = 'donation_hide_forever';
 const LAST_KEY = 'donation_last_shown_at';
 
 export default function DonationDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const [dontShowAgain, setDontShowAgain] = useState(false);
-
   useEffect(() => {
     if (!open) return;
     try {
@@ -17,9 +16,6 @@ export default function DonationDialog({ open, onOpenChange }: { open: boolean; 
   }, [open]);
 
   const handleClose = () => {
-    try {
-      if (dontShowAgain) localStorage.setItem(HIDE_KEY, 'true');
-    } catch {}
     onOpenChange(false);
   };
 
@@ -39,6 +35,13 @@ export default function DonationDialog({ open, onOpenChange }: { open: boolean; 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
+        <div className="pt-2">
+            <GoogleAdBanner 
+                adSlot="8273615243" 
+                adFormat="auto" 
+                className="w-full h-40 mb-4 rounded-lg overflow-hidden border bg-muted/50 flex items-center justify-center text-[10px] text-muted-foreground"
+            />
+        </div>
         <DialogHeader>
           <DialogTitle>Support Nexaris Module</DialogTitle>
           <DialogDescription>
@@ -46,19 +49,9 @@ export default function DonationDialog({ open, onOpenChange }: { open: boolean; 
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <input
-              id="dont-show"
-              type="checkbox"
-              checked={dontShowAgain}
-              onChange={(e) => setDontShowAgain(e.target.checked)}
-            />
-            <label htmlFor="dont-show" className="text-sm">Don’t show this again</label>
-          </div>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={handleClose}>Not now</Button>
-            <Button variant="outline" onClick={handleCoffee}>Buy us a coffee</Button>
-            <Button onClick={handleMonthly}>Monthly support</Button>
+            <Button variant="outline" className="flex-1" onClick={handleCoffee}>Buy us a coffee</Button>
+            <Button className="flex-1" onClick={handleMonthly}>Monthly support</Button>
           </div>
         </div>
       </DialogContent>

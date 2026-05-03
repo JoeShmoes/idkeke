@@ -1,9 +1,10 @@
 import { generateId, useYooptaEditor, YooptaPlugin } from '@yoopta/editor';
 import { useApp } from '@/components/layout/app-provider';
 import type { Note } from '@/lib/types';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, FileText, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 
@@ -17,6 +18,7 @@ type SubPageBlockData = {
 };
 
 const NoteLinkRender = ({ blockId, attributes, children, element }: any) => {
+  const router = useRouter();
   const editor = useYooptaEditor();
   // Use global app state for notes
   const { notes } = useApp();
@@ -153,14 +155,16 @@ const NoteLinkRender = ({ blockId, attributes, children, element }: any) => {
         e.preventDefault();
         e.stopPropagation();
 
-        const event = new CustomEvent('navigate-to-note', { 
-          detail: { noteId: elementData.id } 
-        });
-        window.dispatchEvent(event);
+        if (elementData.id) {
+          router.push(`/notes?id=${elementData.id}`);
+        }
       }}
       onClick={(e) => {
          e.preventDefault();
          e.stopPropagation();
+         if (elementData.id) {
+           router.push(`/notes?id=${elementData.id}`);
+         }
       }}
       {...attributes}
     >
@@ -227,9 +231,6 @@ const NoteLinkPlugin = new YooptaPlugin({
     shortcuts: ['@'],
   },
 });
-
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useRef } from 'react';
 
 const SubPageRender = ({ blockId, attributes, children, element }: any) => {
   const editor = useYooptaEditor();
@@ -298,8 +299,9 @@ const SubPageRender = ({ blockId, attributes, children, element }: any) => {
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!elementData.id) return;
-        router.push(`/notes?id=${elementData.id}`);
+        if (elementData.id) {
+          router.push(`/notes?id=${elementData.id}`);
+        }
       }}
       {...attributes}
     >

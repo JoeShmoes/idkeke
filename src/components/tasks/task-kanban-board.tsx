@@ -1,14 +1,10 @@
-
 'use client';
 
-import { Droppable, Draggable } from 'react-beautiful-dnd';
 import type { Task, TaskGroup } from '@/lib/types';
 import TaskItem from './task-item';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
-import { Plus } from 'lucide-react';
 import { useApp } from '../layout/app-provider';
-import Link from 'next/link';
 import { KanbanSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMemo } from 'react';
@@ -24,7 +20,16 @@ interface TaskKanbanBoardProps {
     isDragDisabled?: boolean;
 }
 
-export default function TaskKanbanBoard({ tasks, groups, allGroups, onUpdateTask, onDeleteTask, selectedTasks, onToggleSelection, isDragDisabled = false }: TaskKanbanBoardProps) {
+export default function TaskKanbanBoard({ 
+    tasks, 
+    groups, 
+    allGroups, 
+    onUpdateTask, 
+    onDeleteTask, 
+    selectedTasks, 
+    onToggleSelection, 
+    isDragDisabled = false 
+}: TaskKanbanBoardProps) {
     const { appSettings, setIsSettingsOpen } = useApp();
     const availableGroups = allGroups || groups;
 
@@ -58,7 +63,6 @@ export default function TaskKanbanBoard({ tasks, groups, allGroups, onUpdateTask
         )
     }
 
-
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full items-start">
             {kanbanGroups.map(group => {
@@ -72,39 +76,28 @@ export default function TaskKanbanBoard({ tasks, groups, allGroups, onUpdateTask
                             <h3 className="text-base font-semibold">{group.name}</h3>
                             <span className="text-sm font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{groupTasks.length}</span>
                         </div>
-                        <Droppable droppableId={group.id} type="TASK" isDropDisabled={false}>
-                            {(provided, snapshot) => (
-                                <ScrollArea 
-                                    className="flex-1"
-                                >
-                                    <div 
-                                        ref={provided.innerRef}
-                                        {...provided.droppableProps}
-                                        className={cn("p-3 space-y-3 transition-colors min-h-[100px]", snapshot.isDraggingOver && 'bg-blue-500/10')}
-                                    >
-                                    {groupTasks.length > 0 ? (
-                                        groupTasks.map((task, index) => (
-                                            <TaskItem 
-                                                key={task.id}
-                                                task={task}
-                                                index={index}
-                                                onUpdate={onUpdateTask}
-                                                onDelete={onDeleteTask}
-                                                isSelected={selectedTasks?.includes(task.id)}
-                                                onToggleSelection={onToggleSelection}
-                                                isDragDisabled={isDragDisabled}
-                                            />
-                                        ))
-                                    ) : (
-                                        <div className="p-4 text-center text-sm text-muted-foreground">
-                                            {snapshot.isDraggingOver ? 'Drop task here' : 'No tasks in this group'}
-                                        </div>
-                                    )}
-                                    {provided.placeholder}
-                                    </div>
-                                </ScrollArea>
+                        <ScrollArea className="flex-1">
+                            <div className="p-3 space-y-3 min-h-[100px]">
+                            {groupTasks.length > 0 ? (
+                                groupTasks.map((task, index) => (
+                                    <TaskItem 
+                                        key={task.id}
+                                        task={task}
+                                        index={index}
+                                        onUpdate={onUpdateTask}
+                                        onDelete={onDeleteTask}
+                                        isSelected={selectedTasks?.includes(task.id)}
+                                        onToggleSelection={onToggleSelection}
+                                        isDragDisabled={isDragDisabled}
+                                    />
+                                ))
+                            ) : (
+                                <div className="p-4 text-center text-sm text-muted-foreground">
+                                    No tasks in this group
+                                </div>
                             )}
-                        </Droppable>
+                            </div>
+                        </ScrollArea>
                     </div>
                 )
             })}

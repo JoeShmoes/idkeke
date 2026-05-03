@@ -59,10 +59,31 @@ import {
   ContextMenuLabel,
 } from "@/components/ui/context-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useHover } from '@/components/layout/hover-context';
-import Editor from '@/components/yoopta/editor';
+import Editor, { type EditorMethods } from '@/components/yoopta/editor';
 import { generateId } from '@yoopta/editor';
+import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from '@/hooks/use-mobile';
+import MobileNotes from '@/components/notes/mobile-notes';
+import FloatingAI from '@/components/notes/FloatingAI';
 
 type Html2PdfOptions = {
   margin?: number | [number, number] | [number, number, number, number];
@@ -121,7 +142,6 @@ const GRADIENTS = [
 ];
 
 // 3. Define Safe Defaults & Normalization
-// Yoopta Editor v4 expects a Record<string, Block> map as value
 const createEmptyNoteContent = () => {
   const id = generateId();
   return {
@@ -140,42 +160,11 @@ const createEmptyNoteContent = () => {
   };
 };
 
-const EMPTY_EDITOR_VALUE = createEmptyNoteContent();
-
 const normalizeContent = (content: any) => {
-  // 1. If undefined/null, return safe default
   if (!content) return createEmptyNoteContent();
-
-  // 2. If it's wrapped as { blocks: { ... } }, unwrap to map
-  if (content.blocks && typeof content.blocks === 'object') {
-    return content.blocks;
-  }
-
-  // 3. Handle Array (Legacy/Slate format) -> Convert to Yoopta Block Map
-  if (Array.isArray(content)) {
-    const blocks: Record<string, any> = {};
-    content.forEach((block, index) => {
-      const id = block.id || generateId();
-
-      // Attempt to preserve existing structure or construct valid block
-      blocks[id] = {
-        id,
-        type: block.type || 'Paragraph',
-        meta: block.meta || { order: index, depth: 0 },
-        value: block.value || block.children || [
-          {
-            id: generateId(),
-            type: 'Paragraph',
-            children: [{ text: '' }]
-          }
-        ]
-      };
-    });
-    return blocks;
-  }
-
-  // 4. Handle Record<string, Block> (Map only) -> Return as-is
-  if (typeof content === 'object') {
+  
+  // If it's already a valid Yoopta content object
+  if (typeof content === 'object' && !Array.isArray(content)) {
     const keys = Object.keys(content);
     // Check if values look like blocks (have id and type)
     if (keys.length > 0 && content[keys[0]]?.id && content[keys[0]]?.type) {
@@ -183,14 +172,57 @@ const normalizeContent = (content: any) => {
     }
   }
 
+  // Handle Legacy Array format
+  if (Array.isArray(content)) {
+    const blocks: Record<string, any> = {};
+    content.forEach((block, index) => {
+      const id = block.id || generateId();
+      blocks[id] = {
+        id,
+        type: block.type || 'Paragraph',
+        value: block.value || [
+          {
+            id: generateId(),
+            type: 'Paragraph',
+            children: block.children || [{ text: '' }]
+          }
+        ],
+        meta: block.meta || { order: index, depth: 0 },
+      };
+    });
+    return blocks;
+  }
+
   return createEmptyNoteContent();
 };
 
+const isCustomCover = (cover?: string) => {
+  if (!cover) return false;
+  return cover.includes('gradient') || cover.startsWith('#') || cover.startsWith('rgb');
+};
+
+const EMPTY_EDITOR_VALUE = createEmptyNoteContent();
+
 export default function NotesPage() {
-  const { notes, setNotes } = useApp();
+  const { notes, setNotes, appSettings } = useApp();
+  const { toast } = useToast();
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [mounted, setMounted] = useState(false);
+  
+  // Dialog States
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; noteId: string | null }>({
+    isOpen: false,
+    noteId: null
+  });
+  const [renameDialog, setRenameDialog] = useState<{ isOpen: boolean; noteId: string | null; title: string }>({
+    isOpen: false,
+    noteId: null,
+    title: ''
+  });
+
+  const editorRef = useRef<EditorMethods>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -238,6 +270,14 @@ export default function NotesPage() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadedNoteId = useRef<string | null>(null);
   const selectionRef = useRef<HTMLDivElement | null>(null);
+  const [isAIOpen, setIsAIOpen] = useState(false);
+
+  // Handle Ask AI event
+  useEffect(() => {
+    const handleOpenAI = () => setIsAIOpen(true);
+    window.addEventListener('open-alfred-ai', handleOpenAI);
+    return () => window.removeEventListener('open-alfred-ai', handleOpenAI);
+  }, []);
 
   // Initialize active note and handle navigation
   useEffect(() => {
@@ -395,10 +435,12 @@ export default function NotesPage() {
   const handleContentChange = (value: any) => {
     if (!activeNoteId) return;
 
+    // 1. Update local UI state immediately to prevent stale prop "ping-pong"
     setTransientContent(value);
+    setEditorValue(value); // Keep in sync instantly
     setSaveStatus('saving');
 
-    // Debounce persistence to storage
+    // 2. Debounce persistence to global state and storage
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -455,6 +497,45 @@ export default function NotesPage() {
     // Blocks are handled within the Editor component's context menu/slash commands
   };
 
+  const duplicateNote = (note: Note) => {
+    const newNote: Note = {
+      ...note,
+      id: crypto.randomUUID(),
+      title: `${note.title || 'Untitled'} (Copy)`,
+      updatedAt: Date.now(),
+      createdAt: Date.now(),
+    };
+    setNotes(prev => [newNote, ...prev]);
+    setActiveNoteId(newNote.id);
+    router.push(`/notes?id=${newNote.id}`);
+    toast({
+      title: "Note Duplicated",
+      description: `Created a copy of "${note.title}"`,
+    });
+  };
+
+  const handleRename = (note: Note) => {
+    setRenameDialog({
+      isOpen: true,
+      noteId: note.id,
+      title: note.title || ''
+    });
+  };
+
+  const confirmRename = () => {
+    if (renameDialog.noteId) {
+      setNotes(prev => prev.map(n => 
+        n.id === renameDialog.noteId ? { ...n, title: renameDialog.title, updatedAt: Date.now() } : n
+      ));
+      setRenameDialog({ isOpen: false, noteId: null, title: '' });
+      toast({
+        title: "Note Renamed",
+        description: "Your changes have been saved.",
+      });
+    }
+  };
+
+
   const filteredNotes = notes.filter(n =>
     (n.title || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -487,155 +568,149 @@ export default function NotesPage() {
     return () => document.removeEventListener('click', handleLinkClick);
   }, []);
 
-  // Light Mode Variables to force the "Room" (Editor) to stay in light mode
-  const LIGHT_MODE_VARIABLES = {
-    '--background': '0 0% 100%',
-    '--foreground': '222.2 84% 4.9%',
-    '--card': '0 0% 100%',
-    '--card-foreground': '222.2 84% 4.9%',
-    '--popover': '0 0% 100%',
-    '--popover-foreground': '222.2 84% 4.9%',
-    '--primary': '222.2 47.4% 11.2%',
-    '--primary-foreground': '210 40% 98%',
-    '--secondary': '210 40% 96.1%',
-    '--secondary-foreground': '222.2 47.4% 11.2%',
-    '--muted': '210 40% 96.1%',
-    '--muted-foreground': '215.4 16.3% 46.9%',
-    '--accent': '210 40% 96.1%',
-    '--accent-foreground': '222.2 47.4% 11.2%',
-    '--destructive': '0 84.2% 60.2%',
-    '--destructive-foreground': '210 40% 98%',
-    '--border': '214.3 31.8% 91.4%',
-    '--input': '214.3 31.8% 91.4%',
-    '--ring': '222.2 84% 4.9%',
-  } as React.CSSProperties;
+
+  const isMobile = useIsMobile();
+
+  if (isMobile) return <MobileNotes />;
 
   return (
     <div className="flex h-full bg-background text-foreground">
-      {/* Left Sidebar - Refined Notion Style */}
-      <div className="w-64 flex flex-col border-r bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-xl transition-all duration-300 group/sidebar">
+      {/* Left Sidebar - Smart Hover Behavior */}
+      <div 
+        className={cn(
+          "flex flex-col items-start border-r bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-xl transition-all duration-300 ease-in-out group/sidebar overflow-hidden shrink-0 relative",
+          notes.length === 0 
+            ? "w-64" 
+            : "w-3 hover:w-64 delay-300 hover:delay-0 cursor-pointer"
+        )}
+      >
+        {/* Hover Hint Indicator */}
+        {notes.length > 0 && (
+          <div className="absolute inset-y-0 right-0 w-[1px] bg-white/5 group-hover/sidebar:bg-transparent transition-colors z-20" />
+        )}
 
-        {/* Sidebar Header & Actions */}
-        <div className="p-3 space-y-3">
-          <div
-            onClick={createNewNote}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground bg-white dark:bg-white/5 border shadow-sm hover:bg-zinc-50 dark:hover:bg-white/10 rounded-md cursor-pointer transition-all"
-          >
-            <Plus className="w-4 h-4 text-muted-foreground" />
-            <span>New Page</span>
-          </div>
+        {/* Pin inner container to the left edge */}
+        <div className="w-64 flex flex-col h-full shrink-0 absolute left-0 top-0 bottom-0">
+          {/* Sidebar Header & Actions */}
+          <div className="p-3 space-y-3">
+            <div
+              onClick={createNewNote}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground bg-white dark:bg-white/5 border shadow-sm hover:bg-zinc-50 dark:hover:bg-white/10 rounded-md cursor-pointer transition-all"
+            >
+              <Plus className="w-4 h-4 text-muted-foreground" />
+              <span>New Page</span>
+            </div>
 
-          <div className="relative group px-0">
-            <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground bg-muted/30 hover:bg-muted/50 rounded-md transition-colors border border-transparent focus-within:border-muted-foreground/20 focus-within:bg-background">
-              <Search className="w-4 h-4 opacity-50" />
-              <input
-                className="flex-1 bg-transparent border-none outline-none placeholder:text-muted-foreground/50 text-foreground h-6"
-                placeholder="Search pages..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="relative group px-0">
+              <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground bg-muted/30 hover:bg-muted/50 rounded-md transition-colors border border-transparent focus-within:border-muted-foreground/20 focus-within:bg-background">
+                <Search className="w-4 h-4 opacity-50" />
+                <input
+                  className="flex-1 bg-transparent border-none outline-none placeholder:text-muted-foreground/50 text-foreground h-6"
+                  placeholder="Search pages..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <ScrollArea className="flex-1 px-3">
-          <div className="pb-4 pt-2">
-            <h2 className="text-[11px] font-semibold text-muted-foreground/40 uppercase tracking-wider mb-2 px-1">Private</h2>
+          <ScrollArea className="flex-1">
+            <div className="pb-4 pt-2 px-3">
+              <h2 className="text-[11px] font-semibold text-muted-foreground/40 uppercase tracking-wider mb-2 px-1">Private</h2>
 
-            <div className="space-y-1">
-              {filteredNotes.length === 0 ? (
-                <div className="px-2 py-8 text-center text-xs text-muted-foreground/50 italic">
-                  {searchQuery ? 'No pages found' : 'No pages yet'}
-                </div>
-              ) : (
-                filteredNotes.map(note => (
-                  <ContextMenu key={note.id}>
-                    <ContextMenuTrigger>
-                      <div
-                        onClick={() => handleNoteSelect(note.id)}
-                        onMouseEnter={() => setHoveredItem({ type: 'note', data: note })}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        className={cn(
-                          "group flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-all select-none border border-transparent",
-                          activeNoteId === note.id
-                            ? "bg-white dark:bg-white/10 text-foreground font-medium shadow-sm border-black/5 dark:border-white/5"
-                            : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
-                        )}
-                      >
-                        <div className="flex items-center gap-3 min-w-0 overflow-hidden flex-1">
-                          <span className="text-base shrink-0 opacity-80">{note.icon || <FileText className="w-4 h-4" />}</span>
-                          <span className="truncate text-sm">
-                            {note.title || 'Untitled'}
-                          </span>
+              <div className="space-y-1">
+                {filteredNotes.length === 0 ? (
+                  <div className="px-2 py-8 text-center text-xs text-muted-foreground/50 italic">
+                    {searchQuery ? 'No pages found' : 'No pages yet'}
+                  </div>
+                ) : (
+                  filteredNotes.map(note => (
+                    <ContextMenu key={note.id}>
+                      <ContextMenuTrigger>
+                        <div
+                          onClick={() => handleNoteSelect(note.id)}
+                          onMouseEnter={() => setHoveredItem({ type: 'note', data: note })}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          className={cn(
+                            "group flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-all select-none border border-transparent",
+                            activeNoteId === note.id
+                              ? "bg-white dark:bg-white/10 text-foreground font-medium shadow-sm border-black/5 dark:border-white/5"
+                              : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
+                          )}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 overflow-hidden flex-1">
+                            <span className="text-base shrink-0 opacity-80">{note.icon || <FileText className="w-4 h-4" />}</span>
+                            <span className="truncate text-sm">
+                              {note.title || 'Untitled'}
+                            </span>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted-foreground/10 rounded-sm ml-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreHorizontal className="w-3 h-3 text-muted-foreground" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-64 max-h-[300px] overflow-y-auto">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (activeNoteId !== note.id) {
+                                    handleNoteSelect(note.id);
+                                    setPendingDownloadId(note.id);
+                                  } else {
+                                    handleDownloadPDF();
+                                  }
+                                }}
+                              >
+                                <Download className="w-4 h-4 mr-2" />
+                                Download PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => deleteNote(e, note.id)} className="text-red-500 focus:text-red-500">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted-foreground/10 rounded-sm ml-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreHorizontal className="w-3 h-3 text-muted-foreground" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-64 max-h-[300px] overflow-y-auto">
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (activeNoteId !== note.id) {
-                                  handleNoteSelect(note.id);
-                                  setPendingDownloadId(note.id);
-                                } else {
-                                  handleDownloadPDF();
-                                }
-                              }}
-                            >
-                              <Download className="w-4 h-4 mr-2" />
-                              Download PDF
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => deleteNote(e, note.id)} className="text-red-500 focus:text-red-500">
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto">
-                      <ContextMenuItem
-                        onClick={() => {
-                          if (activeNoteId !== note.id) {
-                            handleNoteSelect(note.id);
-                            setPendingDownloadId(note.id);
-                          } else {
-                            handleDownloadPDF();
-                          }
-                        }}
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download PDF
-                      </ContextMenuItem>
-                      <ContextMenuItem onClick={(e) => deleteNote(e, note.id)} className="text-red-500 focus:text-red-500">
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                ))
-              )}
+                      </ContextMenuTrigger>
+                      <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto">
+                        <ContextMenuItem
+                          onClick={() => {
+                            if (activeNoteId !== note.id) {
+                              handleNoteSelect(note.id);
+                              setPendingDownloadId(note.id);
+                            } else {
+                              handleDownloadPDF();
+                            }
+                          }}
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download PDF
+                        </ContextMenuItem>
+                        <ContextMenuItem onClick={(e) => deleteNote(e, note.id)} className="text-red-500 focus:text-red-500">
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        </ScrollArea>
+          </ScrollArea>
+        </div>
       </div>
 
       {/* Right Column - Editor */}
-      {/* Forced Light Mode for the entire Room */}
       <div
-        className="flex-1 flex flex-col h-full overflow-hidden bg-white text-slate-900 relative"
+        className="flex-1 flex flex-col h-full overflow-hidden bg-background text-foreground relative"
         ref={selectionRef}
-        style={LIGHT_MODE_VARIABLES}
       >
         {activeNote ? (
           <>
@@ -687,12 +762,12 @@ export default function NotesPage() {
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-900 hover:bg-slate-100">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent">
                       <MoreHorizontal className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" style={LIGHT_MODE_VARIABLES} className="bg-white text-slate-900 border-slate-200">
-                    <DropdownMenuItem onClick={() => setPendingDownloadId(activeNote.id)} className="focus:bg-slate-100 focus:text-slate-900">
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setPendingDownloadId(activeNote.id)}>
                       <Download className="w-4 h-4 mr-2" />
                       Export PDF
                     </DropdownMenuItem>
@@ -729,13 +804,13 @@ export default function NotesPage() {
                           <Palette className="w-3 h-3 mr-1.5" /> Change cover
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent align="end" className="w-80 p-0 bg-white border-slate-200" style={LIGHT_MODE_VARIABLES}>
+                      <PopoverContent align="end" className="w-80 p-0 shadow-xl border-border/50">
                         <Tabs defaultValue="presets" className="w-full">
-                          <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 border-slate-200">
-                            <TabsTrigger value="presets" className="rounded-none border-b-2 border-transparent data-[state=active]:border-slate-900 data-[state=active]:bg-transparent text-slate-500 data-[state=active]:text-slate-900">
+                          <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 border-border/50">
+                            <TabsTrigger value="presets" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-muted-foreground data-[state=active]:text-foreground">
                               Presets
                             </TabsTrigger>
-                            <TabsTrigger value="custom" className="rounded-none border-b-2 border-transparent data-[state=active]:border-slate-900 data-[state=active]:bg-transparent text-slate-500 data-[state=active]:text-slate-900">
+                            <TabsTrigger value="custom" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-muted-foreground data-[state=active]:text-foreground">
                               Custom
                             </TabsTrigger>
                           </TabsList>
@@ -893,7 +968,7 @@ export default function NotesPage() {
                               <PopoverContent className="w-auto p-0 border-none bg-transparent shadow-none" align="start">
                                 <EmojiPicker
                                   onEmojiClick={(emoji) => updateNoteProperty('icon', emoji.emoji)}
-                                  theme={Theme.AUTO}
+                                  theme={appSettings.theme === 'dark' ? Theme.DARK : Theme.LIGHT}
                                   skinTonesDisabled
                                   searchDisabled={false}
                                   width={350}
@@ -1008,6 +1083,7 @@ export default function NotesPage() {
                       </div>
 
                       <Input
+                        ref={titleInputRef}
                         value={activeNote.title}
                         onChange={(e) => updateTitle(e.target.value)}
                         className="text-5xl font-bold border-none shadow-none px-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent h-auto placeholder:text-muted-foreground/20 leading-tight text-foreground w-full"
@@ -1018,6 +1094,7 @@ export default function NotesPage() {
 
                     <div className="relative min-h-[500px]" id="note-editor-content">
                       <Editor 
+                        ref={editorRef}
                         key={activeNote?.id}
                         noteId={activeNote?.id || ''}
                         value={editorValue}
@@ -1029,64 +1106,107 @@ export default function NotesPage() {
                     </div>
                   </div>
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto bg-white border-slate-200 text-slate-900" style={LIGHT_MODE_VARIABLES}>
-                  <ContextMenuLabel className="text-slate-500">Basic Blocks</ContextMenuLabel>
-                  <ContextMenuItem onClick={() => handleInsertBlock('Paragraph')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <FileText className="w-4 h-4 mr-2 text-slate-500" /> Text
+                <ContextMenuContent className="w-64 max-h-[300px] overflow-y-auto">
+                  <ContextMenuItem onClick={() => handleRename(activeNote)}>
+                    <FileText className="w-4 h-4 mr-2 text-muted-foreground" /> Rename
                   </ContextMenuItem>
-                  <ContextMenuItem onClick={() => handleInsertBlock('HeadingOne')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <Heading1 className="w-4 h-4 mr-2 text-slate-500" /> Heading 1
+                  <ContextMenuItem onClick={() => duplicateNote(activeNote)}>
+                    <Copy className="w-4 h-4 mr-2 text-muted-foreground" /> Duplicate
                   </ContextMenuItem>
-                  <ContextMenuItem onClick={() => handleInsertBlock('HeadingTwo')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <Heading2 className="w-4 h-4 mr-2 text-slate-500" /> Heading 2
-                  </ContextMenuItem>
-                  <ContextMenuItem onClick={() => handleInsertBlock('HeadingThree')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <Heading3 className="w-4 h-4 mr-2 text-slate-500" /> Heading 3
+                  <ContextMenuItem onClick={() => setPendingDownloadId(activeNote.id)}>
+                    <Download className="w-4 h-4 mr-2 text-muted-foreground" /> Export PDF
                   </ContextMenuItem>
 
-                  <ContextMenuSeparator className="bg-slate-100" />
-                  <ContextMenuLabel className="text-slate-500">Lists</ContextMenuLabel>
-                  <ContextMenuItem onClick={() => handleInsertBlock('BulletedList')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <List className="w-4 h-4 mr-2 text-slate-500" /> Bullet List
-                  </ContextMenuItem>
-                  <ContextMenuItem onClick={() => handleInsertBlock('NumberedList')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <ListOrdered className="w-4 h-4 mr-2 text-slate-500" /> Numbered List
-                  </ContextMenuItem>
-
-                  <ContextMenuSeparator className="bg-slate-100" />
-                  <ContextMenuLabel className="text-slate-500">Media & Objects</ContextMenuLabel>
-                  <ContextMenuItem onClick={() => handleInsertBlock('Divider')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <Minus className="w-4 h-4 mr-2 text-slate-500" /> Divider
-                  </ContextMenuItem>
-
-                  <ContextMenuSeparator className="bg-slate-100" />
-                  <ContextMenuLabel className="text-slate-500">Advanced</ContextMenuLabel>
-                  <ContextMenuItem onClick={() => handleInsertBlock('Callout')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <Quote className="w-4 h-4 mr-2 text-slate-500" /> Callout
-                  </ContextMenuItem>
-                  <ContextMenuItem onClick={() => handleInsertBlock('Code')} className="focus:bg-slate-100 focus:text-slate-900">
-                    <CodeIcon className="w-4 h-4 mr-2 text-slate-500" /> Code Block
+                  <ContextMenuSeparator />
+                  
+                  <ContextMenuItem 
+                    onClick={() => setDeleteDialog({ isOpen: true, noteId: activeNote.id })}
+                    className="text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/30"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete Note
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
             </ScrollArea>
+
+            {/* Dialogs */}
+            <AlertDialog open={deleteDialog.isOpen} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, isOpen: open }))}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete your note and remove it from our servers.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    onClick={() => {
+                      if (deleteDialog.noteId) {
+                        deleteNote({ stopPropagation: () => {} } as any, deleteDialog.noteId);
+                        setDeleteDialog({ isOpen: false, noteId: null });
+                      }
+                    }}
+                  >
+                    Delete Note
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <Dialog open={renameDialog.isOpen} onOpenChange={(open) => setRenameDialog(prev => ({ ...prev, isOpen: open }))}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Rename Note</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center space-x-2 py-4">
+                  <div className="grid flex-1 gap-2">
+                    <Input
+                      id="note-title"
+                      value={renameDialog.title}
+                      onChange={(e) => setRenameDialog(prev => ({ ...prev, title: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') confirmRename();
+                        if (e.key === 'Escape') setRenameDialog(prev => ({ ...prev, isOpen: false }));
+                      }}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setRenameDialog(prev => ({ ...prev, isOpen: false }))}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={confirmRename}>
+                    Save changes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-500 bg-slate-50/30">
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center">
-                <FileText className="w-8 h-8 opacity-20 text-slate-900" />
-              </div>
-              <div className="space-y-1">
-                <p className="font-medium text-slate-900">No page selected</p>
-                <p className="text-sm opacity-60">Select a page from the sidebar or create a new one</p>
-              </div>
-              <Button onClick={createNewNote} variant="outline" className="mt-4 bg-white text-slate-900 border-slate-200 hover:bg-slate-100">
-                Create a Page
-              </Button>
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border flex items-center justify-center mb-2 shadow-sm">
+              <FileText className="w-8 h-8 opacity-20" />
             </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium text-foreground">Select a page to start writing</h3>
+              <p className="text-xs text-muted-foreground max-w-[200px]">Choose an existing page from the sidebar or create a new one.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={createNewNote} className="h-8 gap-2 bg-white dark:bg-white/5 border shadow-sm hover:bg-zinc-50 dark:hover:bg-white/10 transition-all">
+              <Plus className="w-4 h-4" />
+              <span>Create new page</span>
+            </Button>
           </div>
         )}
+        
+        {/* Floating AI Panel */}
+        <FloatingAI isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
       </div>
     </div>
   );

@@ -10,9 +10,15 @@ import {
   ToastViewport,
 } from "@/components/ui/toast"
 import { useToast } from "@/hooks/use-toast"
+import { useApp } from "@/components/layout/app-provider"
 
 export function Toaster() {
   const { toasts } = useToast()
+  const { appSettings } = useApp()
+
+  if (!appSettings?.showToasts) {
+    return null;
+  }
 
   return (
     <ToastProvider>

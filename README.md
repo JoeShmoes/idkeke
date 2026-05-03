@@ -1,6 +1,6 @@
-# Nexaris Module - Your Personal OS
+# Nexaris Module - Your Personal Productivity Workspace
 
-Welcome to the Nexaris Module, a comprehensive personal operating system designed to integrate your work, life, and intelligence into one unified and powerful workspace. This application is built to be your all-in-one solution for managing every facet of your personal and professional life with the help of a sophisticated AI assistant.
+Welcome to the Nexaris Module, a comprehensive personal productivity workspace designed to integrate your work, life, and intelligence into one unified and powerful environment. This application is built to be your all-in-one solution for managing every facet of your personal and professional life with the help of a sophisticated AI assistant.
 
 ![Nexaris Module](https://picsum.photos/seed/nexaris-module/1200/600)
 <p align="center"><i>A unified dashboard for your entire life.</i></p>

@@ -8,7 +8,6 @@ export const availableRooms = [
     { id: 'goals', name: 'Goals', description: 'Goal setting and progress tracking' },
     { id: 'docmost', name: 'Docmost', description: 'Documentation and Wiki' },
     { id: 'asset-tracker', name: 'Asset Tracker', description: 'Asset management and tracking' },
-    { id: 'brand-room', name: 'Brand Room', description: 'Brand management and assets' },
     { id: 'research', name: 'Research', description: 'Research and analysis tools' },
     { id: 'networking', name: 'Networking', description: 'Professional networking' },
     { id: 'learning', name: 'Learning', description: 'Learning and development' },

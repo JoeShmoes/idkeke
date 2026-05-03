@@ -10,7 +10,6 @@ import AddTaskDialog from '@/components/tasks/add-task-dialog';
 import AddGroupDialog from '@/components/tasks/add-group-dialog';
 import BulkEditDialog, { BulkUpdates } from '@/components/tasks/bulk-edit-dialog';
 import type { Task, TaskGroup, TaskView } from '@/lib/types';
-import { DragDropContext, type DropResult } from 'react-beautiful-dnd';
 import { allAchievements } from '@/lib/achievements';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -19,13 +18,14 @@ import TaskListGroupByDate from '@/components/tasks/task-list-group-by-date';
 import TaskKanbanBoard from '@/components/tasks/task-kanban-board';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import MobileTasks from '@/components/tasks/mobile-tasks';
 
 type TaskFilter = 'all' | 'completed' | 'incomplete';
 type TaskSort = 'default' | 'dueDate' | 'createdAt-asc' | 'createdAt-desc';
 
 export default function TasksPage() {
-  const { tasks, setTasks, taskGroups, setTaskGroups, appSettings, ...appData } = useApp();
-  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  const { tasks, setTasks, taskGroups, setTaskGroups, appSettings, isAddTaskOpen, setIsAddTaskOpen, ...appData } = useApp();
   const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
@@ -57,11 +57,14 @@ export default function TasksPage() {
     const groupTasks = tasks.filter(t => t.groupId === newTask.groupId);
     const maxOrder = groupTasks.length > 0 ? Math.max(...groupTasks.map(t => t.order || 0)) : -1;
 
+    const now = new Date().toISOString();
     const taskToAdd: Task = {
       ...newTask,
       id: Date.now().toString(),
       completed: false,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
+      priority: newTask.priority || 'medium',
       order: maxOrder + 1,
     };
     setTasks(prev => [taskToAdd, ...prev]);
@@ -69,63 +72,68 @@ export default function TasksPage() {
 
   // Move Group
   const handleMoveGroup = (groupId: string, direction: 'up' | 'down') => {
-    // Find the group
     const groupIndex = taskGroups.findIndex(g => g.id === groupId);
     if (groupIndex === -1) return;
 
-    const newGroups = [...taskGroups];
     const swapIndex = direction === 'up' ? groupIndex - 1 : groupIndex + 1;
+    if (swapIndex < 0 || swapIndex >= taskGroups.length) return;
 
-    if (swapIndex < 0 || swapIndex >= newGroups.length) return;
+    const newGroups = [...taskGroups];
+    const [movedGroup] = newGroups.splice(groupIndex, 1);
+    newGroups.splice(swapIndex, 0, movedGroup);
 
-    // Swap
-    [newGroups[groupIndex], newGroups[swapIndex]] = [newGroups[swapIndex], newGroups[groupIndex]];
-
-    // Update orders
-    const updates = newGroups.map((g, index) => ({
-      id: g.id,
+    // Re-assign orders to ALL groups to ensure consistency
+    const finalizedGroups = newGroups.map((g, index) => ({
+      ...g,
       order: index
     }));
 
-    setTaskGroups(newGroups);
+    setTaskGroups(finalizedGroups);
   };
 
   // Move Task
   const handleMoveTask = (taskId: string, direction: 'up' | 'down') => {
     setTasks(prev => {
-        const newTasks = [...prev];
-        const taskIndex = newTasks.findIndex(t => t.id === taskId);
-        if (taskIndex === -1) return prev;
-
-        const task = newTasks[taskIndex];
+        const task = prev.find(t => t.id === taskId);
+        if (!task) return prev;
         
-        // Find adjacent task in the same group to swap with
-        const groupTasks = newTasks
+        // Get all tasks in this group and sort them by current order
+        const groupTasks = prev
             .filter(t => t.groupId === task.groupId)
-            .sort((a,b) => (a.order || 0) - (b.order || 0));
+            .sort((a, b) => {
+                if ((a.order ?? 0) !== (b.order ?? 0)) return (a.order ?? 0) - (b.order ?? 0);
+                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+            });
             
-        const currentGroupIndex = groupTasks.findIndex(t => t.id === taskId);
+        const currentIndex = groupTasks.findIndex(t => t.id === taskId);
+        const swapIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
         
-        if (direction === 'up' && currentGroupIndex > 0) {
-            const prevTask = groupTasks[currentGroupIndex - 1];
-            // Swap orders
-            const tempOrder = task.order || 0;
-            task.order = prevTask.order || 0;
-            prevTask.order = tempOrder;
-        } else if (direction === 'down' && currentGroupIndex < groupTasks.length - 1) {
-            const nextTask = groupTasks[currentGroupIndex + 1];
-            // Swap orders
-            const tempOrder = task.order || 0;
-            task.order = nextTask.order || 0;
-            nextTask.order = tempOrder;
-        }
+        if (swapIndex < 0 || swapIndex >= groupTasks.length) return prev;
+        
+        const swapTask = groupTasks[swapIndex];
+        
+        // Ensure both have valid orders for the swap
+        const taskOrder = currentIndex;
+        const swapTaskOrder = swapIndex;
 
-        return [...newTasks];
+        const now = new Date().toISOString();
+        return prev.map(t => {
+            // First, normalize ALL tasks in this group to have their current index-based order
+            // so that the swap is clean and persistent
+            if (t.groupId === task.groupId) {
+                const idx = groupTasks.findIndex(gt => gt.id === t.id);
+                if (t.id === taskId) return { ...t, order: swapTaskOrder, updatedAt: now };
+                if (t.id === swapTask.id) return { ...t, order: taskOrder, updatedAt: now };
+                return { ...t, order: idx };
+            }
+            return t;
+        });
     });
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
-    setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+    const now = new Date().toISOString();
+    setTasks(prev => prev.map(t => t.id === updatedTask.id ? { ...updatedTask, updatedAt: now } : t));
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -147,9 +155,11 @@ export default function TasksPage() {
   };
 
   const handleAddGroup = (groupName: string) => {
+    const maxOrder = taskGroups.length > 0 ? Math.max(...taskGroups.map(g => g.order || 0)) : -1;
     const newGroup: TaskGroup = {
       id: Date.now().toString(),
       name: groupName,
+      order: maxOrder + 1,
     };
     setTaskGroups(prev => [...prev, newGroup]);
   };
@@ -173,10 +183,6 @@ export default function TasksPage() {
 
 
 
-  const onDragEnd = (result: DropResult) => {
-    // Drag and drop disabled as per user request. Users must use the reorder feature.
-    return;
-  };
 
 
   const currentLevel = useMemo(() => {
@@ -313,6 +319,7 @@ export default function TasksPage() {
   };
 
   const handleBulkUpdate = (updates: BulkUpdates) => {
+    const now = new Date().toISOString();
     setTasks(prev => prev.map(task => {
         if (!selectedTasks.includes(task.id)) return task;
         
@@ -320,7 +327,8 @@ export default function TasksPage() {
             ...task,
             ...(updates.completed !== undefined && { completed: updates.completed }),
             ...(updates.groupId && { groupId: updates.groupId }),
-            ...(updates.dueDate !== undefined && { dueDate: updates.dueDate })
+            ...(updates.dueDate !== undefined && { dueDate: updates.dueDate }),
+            updatedAt: now
         };
     }));
     setSelectedTasks([]);
@@ -352,8 +360,13 @@ export default function TasksPage() {
     } else if (sort === 'createdAt-desc') {
        newTasks.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else {
-       // Default sort by order to ensure consistent indexing
-       newTasks.sort((a,b) => (a.order || 0) - (b.order || 0));
+       // Default sort by order, then by createdAt for stability
+       newTasks.sort((a,b) => {
+           if ((a.order || 0) !== (b.order || 0)) {
+               return (a.order || 0) - (b.order || 0);
+           }
+           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+       });
     }
 
     return newTasks;
@@ -398,11 +411,13 @@ export default function TasksPage() {
   }, [filteredAndSortedTasks]);
 
   const groupedTasks = useMemo(() => {
-    return taskGroups.map(group => ({
+    return taskGroups
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map(group => ({
         id: group.id,
         name: group.name,
         tasks: filteredAndSortedTasks.filter(t => t.groupId === group.id)
-    }));
+      }));
   }, [taskGroups, filteredAndSortedTasks]);
 
   useEffect(() => {
@@ -443,7 +458,6 @@ export default function TasksPage() {
 
     if (taskView === 'kanban') {
       return (
-        <DragDropContext onDragEnd={onDragEnd}>
           <TaskKanbanBoard 
             tasks={filteredAndSortedTasks} 
             groups={taskGroups}
@@ -454,7 +468,6 @@ export default function TasksPage() {
             onToggleSelection={handleToggleTaskSelection}
             isDragDisabled={areFiltersActive}
           />
-        </DragDropContext>
       )
     }
 
@@ -469,7 +482,6 @@ export default function TasksPage() {
     }
 
     return (
-        <DragDropContext onDragEnd={onDragEnd}>
             <TaskList 
                 groupedTasks={groupedTasks}
                 onUpdateTask={handleUpdateTask}
@@ -483,14 +495,27 @@ export default function TasksPage() {
                 onToggleSelection={handleToggleTaskSelection}
                 onMoveTask={areFiltersActive ? undefined : handleMoveTask}
                 onMoveGroup={areFiltersActive ? undefined : handleMoveGroup}
+                expandedGroups={appSettings.tasks.expandedGroups || groupedTasks.map(g => g.id)}
+                onExpandedGroupsChange={(ids) => {
+                  setAppSettings(prev => ({
+                    ...prev,
+                    tasks: {
+                      ...prev.tasks,
+                      expandedGroups: ids
+                    }
+                  }));
+                }}
             />
-        </DragDropContext>
     );
   }
+
+  const isMobile = useIsMobile();
 
   if (!isClient) {
     return null;
   }
+
+  if (isMobile) return <MobileTasks />;
 
   return (
     <div 
@@ -655,12 +680,6 @@ export default function TasksPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AddTaskDialog 
-        isOpen={isAddTaskOpen}
-        onOpenChange={setIsAddTaskOpen}
-        onAddTask={handleAddTask}
-        groups={taskGroups}
-      />
       <AddGroupDialog
         isOpen={isAddGroupOpen}
         onOpenChange={setIsAddGroupOpen}
